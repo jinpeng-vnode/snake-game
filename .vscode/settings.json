@@ -3,6 +3,8 @@
         "git *",
         "gh issue *",
         "gh label *",
-        "gh pr *"
+        "gh pr *",
+        "ls *",
+        "mkdir *"
     ]
 }
