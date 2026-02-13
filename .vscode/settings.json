@@ -1,0 +1,8 @@
+{
+    "kiroAgent.trustedCommands": [
+        "git *",
+        "gh issue *",
+        "gh label *",
+        "gh pr *"
+    ]
+}
