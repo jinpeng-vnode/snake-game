@@ -3,6 +3,26 @@
         "git *",
         "gh issue *",
         "gh label *",
-        "gh pr *"
+        "gh pr *",
+        "mkdir *",
+        "ls *",
+        "cat *",
+        "cp *",
+        "mv *",
+        "rm *",
+        "docker *",
+        "docker-compose *",
+        "npm *",
+        "npx *",
+        "node *",
+        "python *",
+        "pip *",
+        "pytest *",
+        "chmod *",
+        "find *",
+        "grep *",
+        "echo *",
+        "touch *",
+        "pwd"
     ]
 }
