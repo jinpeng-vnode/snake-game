@@ -23,6 +23,7 @@
         "grep *",
         "echo *",
         "touch *",
-        "pwd"
+        "pwd",
+        "gh *"
     ]
 }
