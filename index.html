@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贪吃蛇游戏</title>
+    <style>
+        /* 全局重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0f0f23;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+
+        /* 游戏容器 */
+        .game-container {
+            width: 400px;
+        }
+
+        /* 分数面板 — Canvas 上方的 HTML 元素 */
+        .score-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 400px;
+            height: 40px;
+            padding: 8px 0;
+            color: #ffffff;
+            font-size: 20px;
+        }
+
+        /* 游戏画布 */
+        #gameCanvas {
+            display: block;
+            border: 2px solid #16213e;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- 分数面板 -->
+        <div class="score-panel">
+            <span id="score">分数: 0</span>
+            <span id="highScore">最高分: 0</span>
+        </div>
+        <!-- 游戏画布 -->
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
