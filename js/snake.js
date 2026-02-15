@@ -95,6 +95,19 @@ const Snake = {
      */
     getLength() {
         return this.segments.length;
+    },
+
+    /**
+     * 缩短蛇身（最短保持 1 节）（TASK-006）
+     * @param {number} count - 缩短节数
+     * @returns {void}
+     */
+    shrink(count) {
+        const minLength = 1;
+        const removeCount = Math.min(count, this.segments.length - minLength);
+        if (removeCount > 0) {
+            this.segments.splice(-removeCount, removeCount);
+        }
     }
 };
 
