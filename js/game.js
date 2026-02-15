@@ -12,6 +12,7 @@ import Input from './input.js';
 import Score from './score.js';
 import Renderer from './renderer.js';
 import ParticleSystem from './particle.js';
+import SoundManager from './sound.js';
 
 const Game = {
     /** @type {string} 当前游戏状态 */
@@ -45,6 +46,19 @@ const Game = {
             this.handleAction.bind(this)
         );
 
+        // TASK-003: 初始化音效系统
+        SoundManager.init();
+
+        // TASK-003: 绑定静音按钮
+        const muteBtn = document.getElementById('muteBtn');
+        if (muteBtn) {
+            muteBtn.textContent = SoundManager.isMuted() ? '🔇' : '🔊';
+            muteBtn.addEventListener('click', function() {
+                SoundManager.ensureContext();
+                SoundManager.toggleMute();
+            });
+        }
+
         Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
         Renderer.drawBackground();
@@ -71,6 +85,10 @@ const Game = {
      */
     start() {
         this.state = GameState.PLAYING;
+
+        // TASK-003: 确保 AudioContext 已创建（用户交互触发），启动背景音乐
+        SoundManager.ensureContext();
+        SoundManager.startBgm();
 
         Snake.init();
         Score.reset();
@@ -127,6 +145,9 @@ const Game = {
 
         // 7. 吃到食物后加分并生成新食物
         if (ateFood) {
+            // TASK-003: 播放吃食物音效
+            SoundManager.playEat();
+
             Score.add();
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
@@ -158,6 +179,11 @@ const Game = {
      */
     gameOver() {
         this.state = GameState.GAME_OVER;
+
+        // TASK-003: 播放游戏结束音效，停止背景音乐
+        SoundManager.playGameOver();
+        SoundManager.stopBgm();
+
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
@@ -171,6 +197,10 @@ const Game = {
      */
     win() {
         this.state = GameState.WIN;
+
+        // TASK-003: 停止背景音乐
+        SoundManager.stopBgm();
+
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
