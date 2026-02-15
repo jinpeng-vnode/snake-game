@@ -21,26 +21,30 @@
             font-family: Arial, sans-serif;
         }
 
-        /* 游戏容器 */
+        /* 游戏容器（居中，宽度自适应） */
         .game-container {
-            width: 400px;
+            width: min(90vw, 90vh);
+            max-width: 1000px;
         }
 
-        /* 分数面板 — Canvas 上方的 HTML 元素 */
+        /* 分数面板 */
         .score-panel {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            width: 400px;
-            height: 40px;
+            width: 100%;
             padding: 8px 0;
-            color: #ffffff;
-            font-size: 20px;
+            font-size: clamp(16px, 2vw, 32px);
         }
 
-        /* 游戏画布 */
+        #score { color: #FFD700; }
+        #highScore { color: #C0C0C0; }
+
+        /* 游戏画布（宽度跟随容器，高度自动保持比例） */
         #gameCanvas {
             display: block;
+            width: 100%;
+            height: auto;
             border: 2px solid #16213e;
             border-radius: 4px;
         }
@@ -53,7 +57,7 @@
             <span id="score">分数: 0</span>
             <span id="highScore">最高分: 0</span>
         </div>
-        <!-- 游戏画布 -->
+        <!-- 游戏画布（动态尺寸，由JS计算） -->
         <canvas id="gameCanvas" width="400" height="400"></canvas>
     </div>
 

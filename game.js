@@ -9,17 +9,17 @@
 
 // ========== 常量 ==========
 
-/** @type {number} 画布像素尺寸 */
-const CANVAS_SIZE = 400;
-
-/** @type {number} 网格数量（每行/每列） */
+/** @type {number} 网格数量（20×20） */
 const GRID_COUNT = 20;
 
-/** @type {number} 每格像素尺寸 */
-const CELL_SIZE = 20;
+/** @type {number} 每格像素尺寸（30px） */
+const CELL_SIZE = 30;
+
+/** @type {number} 画布像素尺寸（600px = 20 × 30） */
+const CANVAS_SIZE = GRID_COUNT * CELL_SIZE;
 
 /** @type {number} 游戏刷新间隔（毫秒） */
-const TICK_INTERVAL = 200;
+const TICK_INTERVAL = 180;
 
 /** @type {number} 每个食物的分值 */
 const SCORE_PER_FOOD = 10;
@@ -61,14 +61,14 @@ const Snake = {
 
     /**
      * 初始化蛇到默认位置和方向
-     * 蛇头 (10,10)，蛇身 (9,10), (8,10)，方向向右
+     * 蛇头 (20,20)，蛇身 (19,20), (18,20)，方向向右（40×40地图中心）
      * @returns {void}
      */
     init() {
         this.segments = [
             { x: 10, y: 10 },
-            { x: 9,  y: 10 },
-            { x: 8,  y: 10 }
+            { x: 9, y: 10 },
+            { x: 8, y: 10 }
         ];
         this.direction = Direction.RIGHT;
     },
@@ -299,171 +299,343 @@ const Score = {
     }
 };
 
+// ========== ParticleSystem 模块（L2-TASK-010: 粒子特效系统） ==========
+
+const ParticleSystem = {
+    /** @type {Array<{x: number, y: number, vx: number, vy: number, alpha: number, life: number}>} */
+    particles: [],
+    
+    /**
+     * 在指定位置生成粒子
+     * @param {number} gridX - 网格 X 坐标
+     * @param {number} gridY - 网格 Y 坐标
+     * @returns {void}
+     */
+    spawn(gridX, gridY) {
+        const centerX = gridX * CELL_SIZE + CELL_SIZE / 2;
+        const centerY = gridY * CELL_SIZE + CELL_SIZE / 2;
+        const count = 6 + Math.floor(Math.random() * 3); // 6-8 个粒子
+        
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+            const speed = 2 + Math.random() * 2; // 2-4 px/frame
+            this.particles.push({
+                x: centerX,
+                y: centerY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                alpha: 1,
+                life: 15 // 15 帧 ≈ 300ms (at 60fps)
+            });
+        }
+    },
+    
+    /**
+     * 更新所有粒子状态
+     * @returns {void}
+     */
+    update() {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            p.alpha = p.life / 15; // 线性淡出
+            
+            if (p.life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+    },
+    
+    /**
+     * 渲染所有粒子
+     * @param {CanvasRenderingContext2D} ctx
+     * @returns {void}
+     */
+    render(ctx) {
+        this.particles.forEach(p => {
+            ctx.fillStyle = `rgba(255, 107, 107, ${p.alpha})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    },
+    
+    /**
+     * 清空所有粒子
+     * @returns {void}
+     */
+    clear() {
+        this.particles = [];
+    }
+};
+
 // ========== Renderer 模块 ==========
 
 const Renderer = {
     /** @type {CanvasRenderingContext2D|null} */
     ctx: null,
 
+    /** @type {HTMLCanvasElement|null} */
+    canvas: null,
+
     /**
-     * 初始化渲染器
+     * 初始化渲染器并设置画布缩放
      * @param {HTMLCanvasElement} canvas
      * @returns {void}
      */
     init(canvas) {
+        this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
+        
+        // 设置画布固定尺寸
+        this.canvas.width = CANVAS_SIZE;
+        this.canvas.height = CANVAS_SIZE;
+        
+        // 画布缩放由 CSS width:100% 处理，无需 JS 干预
     },
 
     /**
-     * 清空画布并绘制网格背景
-     * 背景色 #1a1a2e，网格线 #16213e
+     * 绘制棋盘格背景（UI规格：交替色棋盘格）
      * @returns {void}
      */
     drawBackground() {
         const ctx = this.ctx;
-        // 填充背景
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        // 绘制网格线
-        ctx.strokeStyle = '#16213e';
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= GRID_COUNT; i++) {
-            const pos = i * CELL_SIZE;
-            // 垂直线
-            ctx.beginPath();
-            ctx.moveTo(pos, 0);
-            ctx.lineTo(pos, CANVAS_SIZE);
-            ctx.stroke();
-            // 水平线
-            ctx.beginPath();
-            ctx.moveTo(0, pos);
-            ctx.lineTo(CANVAS_SIZE, pos);
-            ctx.stroke();
+        
+        for (let y = 0; y < GRID_COUNT; y++) {
+            for (let x = 0; x < GRID_COUNT; x++) {
+                ctx.fillStyle = (x + y) % 2 === 0 ? '#1a1a2e' : '#16213e';
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
         }
     },
 
     /**
-     * 绘制蛇
-     * 蛇头 #388E3C，蛇身 #4CAF50，18×18px 带 2px 圆角
+     * 绘制蛇（UI规格：渐变色 #4CAF50 → #81C784 + 蛇头眼睛 + 蛇尾略小）
      * @param {{x: number, y: number}[]} segments
+     * @param {{dx: number, dy: number}} direction - 蛇头方向
      * @returns {void}
      */
-    drawSnake(segments) {
+    drawSnake(segments, direction) {
         const ctx = this.ctx;
+        const len = segments.length;
+        
         segments.forEach((seg, index) => {
-            ctx.fillStyle = index === 0 ? '#388E3C' : '#4CAF50';
-            // 每格内留 1px 间隙，绘制 18×18
             const x = seg.x * CELL_SIZE + 1;
             const y = seg.y * CELL_SIZE + 1;
-            const size = CELL_SIZE - 2;
-            const radius = 2;
-            // 绘制圆角矩形
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + size - radius, y);
-            ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
-            ctx.lineTo(x + size, y + size - radius);
-            ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
-            ctx.lineTo(x + radius, y + size);
-            ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
-            ctx.lineTo(x, y + radius);
-            ctx.quadraticCurveTo(x, y, x + radius, y);
-            ctx.closePath();
-            ctx.fill();
+            let size = CELL_SIZE - 2;
+            
+            // 蛇尾略小（最后一节缩小 20%）
+            if (index === len - 1) {
+                const shrink = CELL_SIZE * 0.1;
+                size = CELL_SIZE - 2 - shrink * 2;
+            }
+            
+            if (index === 0) {
+                // 蛇头：圆角矩形 + 眼睛
+                const radius = CELL_SIZE * 0.3;
+                ctx.fillStyle = '#4CAF50';
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + size - radius, y);
+                ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+                ctx.lineTo(x + size, y + size - radius);
+                ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+                ctx.lineTo(x + radius, y + size);
+                ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.fill();
+                
+                // 眼睛（根据方向调整位置）
+                const centerX = x + size / 2;
+                const centerY = y + size / 2;
+                const eyeRadius = CELL_SIZE * 0.08;
+                let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
+                
+                if (direction.dy === -1) { // UP
+                    leftEyeX = centerX - CELL_SIZE * 0.15;
+                    leftEyeY = centerY - CELL_SIZE * 0.2;
+                    rightEyeX = centerX + CELL_SIZE * 0.15;
+                    rightEyeY = centerY - CELL_SIZE * 0.2;
+                } else if (direction.dy === 1) { // DOWN
+                    leftEyeX = centerX - CELL_SIZE * 0.15;
+                    leftEyeY = centerY + CELL_SIZE * 0.2;
+                    rightEyeX = centerX + CELL_SIZE * 0.15;
+                    rightEyeY = centerY + CELL_SIZE * 0.2;
+                } else if (direction.dx === -1) { // LEFT
+                    leftEyeX = centerX - CELL_SIZE * 0.2;
+                    leftEyeY = centerY - CELL_SIZE * 0.15;
+                    rightEyeX = centerX - CELL_SIZE * 0.2;
+                    rightEyeY = centerY + CELL_SIZE * 0.15;
+                } else { // RIGHT
+                    leftEyeX = centerX + CELL_SIZE * 0.2;
+                    leftEyeY = centerY - CELL_SIZE * 0.15;
+                    rightEyeX = centerX + CELL_SIZE * 0.2;
+                    rightEyeY = centerY + CELL_SIZE * 0.15;
+                }
+                
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(rightEyeX, rightEyeY, eyeRadius, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // 蛇身：渐变色 #4CAF50 → #81C784
+                const progress = index / Math.max(len - 1, 1);
+                const r = Math.round(76 + (129 - 76) * progress);
+                const g = Math.round(175 + (199 - 175) * progress);
+                const b = Math.round(80 + (132 - 80) * progress);
+                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                
+                const radius = CELL_SIZE * 0.2;
+                
+                // 蛇尾需要调整绘制位置（居中）
+                let drawX = x;
+                let drawY = y;
+                if (index === len - 1) {
+                    const shrink = CELL_SIZE * 0.1;
+                    drawX = x + shrink;
+                    drawY = y + shrink;
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(drawX + radius, drawY);
+                ctx.lineTo(drawX + size - radius, drawY);
+                ctx.quadraticCurveTo(drawX + size, drawY, drawX + size, drawY + radius);
+                ctx.lineTo(drawX + size, drawY + size - radius);
+                ctx.quadraticCurveTo(drawX + size, drawY + size, drawX + size - radius, drawY + size);
+                ctx.lineTo(drawX + radius, drawY + size);
+                ctx.quadraticCurveTo(drawX, drawY + size, drawX, drawY + size - radius);
+                ctx.lineTo(drawX, drawY + radius);
+                ctx.quadraticCurveTo(drawX, drawY, drawX + radius, drawY);
+                ctx.closePath();
+                ctx.fill();
+            }
         });
     },
 
     /**
-     * 绘制食物
-     * 红色圆形 #F44336，直径 16px，居中于网格
+     * 绘制食物（UI规格：苹果造型 = 主体 + 高光 + 茎 + 叶子）
      * @param {{x: number, y: number}} position
      * @returns {void}
      */
     drawFood(position) {
         const ctx = this.ctx;
-        ctx.fillStyle = '#F44336';
         const centerX = position.x * CELL_SIZE + CELL_SIZE / 2;
         const centerY = position.y * CELL_SIZE + CELL_SIZE / 2;
+        
+        // 苹果主体
+        ctx.fillStyle = '#F44336';
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, CELL_SIZE * 0.4, 0, Math.PI * 2);
         ctx.fill();
+        
+        // 高光
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(centerX - CELL_SIZE * 0.15, centerY - CELL_SIZE * 0.15, CELL_SIZE * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 茎
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(
+            centerX - CELL_SIZE * 0.04,
+            centerY - CELL_SIZE * 0.55,
+            CELL_SIZE * 0.08,
+            CELL_SIZE * 0.15
+        );
+        
+        // 叶子（椭圆，旋转30度）
+        ctx.save();
+        ctx.translate(centerX + CELL_SIZE * 0.1, centerY - CELL_SIZE * 0.35);
+        ctx.rotate(30 * Math.PI / 180);
+        ctx.fillStyle = '#4CAF50';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, CELL_SIZE * 0.2, CELL_SIZE * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     },
 
     /**
-     * 绘制开始界面
-     * "贪吃蛇" 48px + "按空格键开始游戏" 20px
+     * 绘制开始界面（UI规格：动态字号）
      * @returns {void}
      */
     drawReadyScreen() {
         const ctx = this.ctx;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
-        // 标题
         ctx.fillStyle = '#ffffff';
-        ctx.font = '48px Arial, sans-serif';
-        ctx.fillText('贪吃蛇', CANVAS_SIZE / 2, 160);
 
-        // 提示
-        ctx.font = '20px Arial, sans-serif';
-        ctx.fillText('按空格键开始游戏', CANVAS_SIZE / 2, 220);
+        // 标题（字号 = 画布尺寸 / 8.33）
+        ctx.font = `bold ${Math.floor(CANVAS_SIZE / 8.33)}px Arial, sans-serif`;
+        ctx.fillText('贪吃蛇', CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 40);
+
+        // 提示（字号 = 画布尺寸 / 20）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 20)}px Arial, sans-serif`;
+        ctx.fillText('按空格键开始游戏', CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 20);
     },
 
     /**
-     * 绘制游戏结束界面
-     * 半透明遮罩 + "游戏结束" + 最终分数 + 重新开始提示
+     * 绘制游戏结束界面（UI规格：动态字号）
      * @param {number} finalScore
      * @returns {void}
      */
     drawGameOverScreen(finalScore) {
         const ctx = this.ctx;
+        
         // 遮罩
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
+        
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffffff';
 
-        // 标题
-        ctx.font = '36px Arial, sans-serif';
-        ctx.fillText('游戏结束', CANVAS_SIZE / 2, 140);
+        // 标题（字号 = 画布尺寸 / 11.11）
+        ctx.font = `bold ${Math.floor(CANVAS_SIZE / 11.11)}px Arial, sans-serif`;
+        ctx.fillText('游戏结束', CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 60);
 
-        // 最终分数
-        ctx.font = '24px Arial, sans-serif';
-        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 200);
+        // 最终分数（字号 = 画布尺寸 / 16.67）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 16.67)}px Arial, sans-serif`;
+        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, CANVAS_SIZE / 2);
 
-        // 重新开始提示
-        ctx.font = '18px Arial, sans-serif';
-        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 260);
+        // 重新开始提示（字号 = 画布尺寸 / 22.22）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 22.22)}px Arial, sans-serif`;
+        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 60);
     },
 
     /**
-     * 绘制通关界面
+     * 绘制通关界面（UI规格：动态字号）
      * @param {number} finalScore
      * @returns {void}
      */
     drawWinScreen(finalScore) {
         const ctx = this.ctx;
+        
         // 遮罩
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
+        
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffffff';
 
-        // 标题
-        ctx.font = '36px Arial, sans-serif';
-        ctx.fillText('恭喜通关', CANVAS_SIZE / 2, 140);
+        // 标题（字号 = 画布尺寸 / 11.11）
+        ctx.font = `bold ${Math.floor(CANVAS_SIZE / 11.11)}px Arial, sans-serif`;
+        ctx.fillText('恭喜通关', CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 60);
 
-        // 最终分数
-        ctx.font = '24px Arial, sans-serif';
-        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 200);
+        // 最终分数（字号 = 画布尺寸 / 16.67）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 16.67)}px Arial, sans-serif`;
+        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, CANVAS_SIZE / 2);
 
-        // 重新开始提示
-        ctx.font = '18px Arial, sans-serif';
-        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 260);
+        // 重新开始提示（字号 = 画布尺寸 / 22.22）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 22.22)}px Arial, sans-serif`;
+        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 60);
     }
 };
 
@@ -481,6 +653,9 @@ const Game = {
 
     /** @type {HTMLElement|null} 最高分 DOM 元素 */
     highScoreEl: null,
+
+    /** @type {number|null} 动画帧 ID */
+    animationFrameId: null,
 
     /**
      * 初始化游戏：获取 DOM 元素，初始化所有子模块，绘制开始界面
@@ -508,6 +683,9 @@ const Game = {
         // 绘制开始界面
         Renderer.drawBackground();
         Renderer.drawReadyScreen();
+
+        // 启动渲染循环
+        this.startRenderLoop();
     },
 
     /**
@@ -625,9 +803,7 @@ const Game = {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
         }
-        // 渲染最后一帧（蛇和食物保持最后位置）
         this.render();
-        Renderer.drawGameOverScreen(Score.current);
     },
 
     /**
@@ -641,7 +817,6 @@ const Game = {
             this.loopTimer = null;
         }
         this.render();
-        Renderer.drawWinScreen(Score.current);
     },
 
     /**
@@ -654,7 +829,41 @@ const Game = {
         if (foodPos) {
             Renderer.drawFood(foodPos);
         }
-        Renderer.drawSnake(Snake.segments);
+        Renderer.drawSnake(Snake.segments, Snake.direction);
+    },
+
+    /**
+     * 启动渲染循环（简化版）
+     * 注意：GAME_OVER/WIN 状态需先绘制完整游戏画面再叠加遮罩，
+     * 避免每帧重复叠加半透明遮罩导致界面越来越黑、文字重叠。
+     * @returns {void}
+     */
+    startRenderLoop() {
+        const renderFrame = () => {
+            if (this.state === GameState.READY) {
+                Renderer.drawBackground();
+                Renderer.drawReadyScreen();
+            } else if (this.state === GameState.GAME_OVER) {
+                this.render();
+                Renderer.drawGameOverScreen(Score.current);
+            } else if (this.state === GameState.WIN) {
+                this.render();
+                Renderer.drawWinScreen(Score.current);
+            }
+            this.animationFrameId = requestAnimationFrame(renderFrame);
+        };
+        this.animationFrameId = requestAnimationFrame(renderFrame);
+    },
+
+    /**
+     * 停止渲染循环
+     * @returns {void}
+     */
+    stopRenderLoop() {
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
     }
 };
 
