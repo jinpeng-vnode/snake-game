@@ -256,6 +256,24 @@ const Renderer = {
     },
 
     /**
+     * 绘制墙壁边界（TASK-005）
+     * UI规格: design/ui/L1-TASK-007-游戏界面优化.md 第七节
+     * @returns {void}
+     */
+    drawWalls() {
+        const ctx = this.ctx;
+        ctx.fillStyle = '#3a3a5c';
+        // 上
+        ctx.fillRect(0, 0, CANVAS_SIZE, 4);
+        // 下
+        ctx.fillRect(0, CANVAS_SIZE - 4, CANVAS_SIZE, 4);
+        // 左
+        ctx.fillRect(0, 0, 4, CANVAS_SIZE);
+        // 右
+        ctx.fillRect(CANVAS_SIZE - 4, 0, 4, CANVAS_SIZE);
+    },
+
+    /**
      * 绘制暂停遮罩（TASK-004）
      * UI规格: design/ui/L1-TASK-007-游戏界面优化.md 第五节
      * @returns {void}
