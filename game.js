@@ -9,14 +9,14 @@
 
 // ========== 常量 ==========
 
-/** @type {number} 画布像素尺寸（动态计算，400-800px） */
-let CANVAS_SIZE = 400;
+/** @type {number} 网格数量（固定 50×50，二期扩展） */
+const GRID_COUNT = 50;
 
-/** @type {number} 网格数量（固定 20×20，用户决策） */
-const GRID_COUNT = 20;
+/** @type {number} 每格像素尺寸（固定 20px，保持一期视觉大小） */
+const CELL_SIZE = 20;
 
-/** @type {number} 每格像素尺寸（动态计算） */
-let CELL_SIZE = 8;
+/** @type {number} 画布像素尺寸（固定 1000px = 50 × 20） */
+const CANVAS_SIZE = GRID_COUNT * CELL_SIZE;
 
 /** @type {number} 游戏刷新间隔（毫秒） */
 const TICK_INTERVAL = 180;
@@ -381,40 +381,42 @@ const Renderer = {
     canvas: null,
 
     /**
-     * 初始化渲染器并计算画布尺寸
+     * 初始化渲染器并设置画布缩放
      * @param {HTMLCanvasElement} canvas
      * @returns {void}
      */
     init(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.updateCanvasSize();
+        
+        // 设置画布固定尺寸
+        this.canvas.width = CANVAS_SIZE;
+        this.canvas.height = CANVAS_SIZE;
+        
+        // 初始缩放
+        this.updateCanvasScale();
         
         // 监听窗口缩放（防抖200ms）
         let resizeTimer = null;
         window.addEventListener('resize', () => {
             if (resizeTimer) clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {
-                this.updateCanvasSize();
-                if (window.Game) window.Game.render();
+                this.updateCanvasScale();
             }, 200);
         });
     },
 
     /**
-     * 计算并更新画布尺寸（UI规格：400-800px，20的倍数）
+     * 使用 CSS transform scale 缩放画布适应屏幕
      * @returns {void}
      */
-    updateCanvasSize() {
+    updateCanvasScale() {
         const viewport = Math.min(window.innerWidth, window.innerHeight);
-        const base = viewport * 0.8;
-        const size = Math.max(400, Math.min(800, Math.floor(base / 20) * 20));
+        const maxSize = viewport * 0.8;
+        const scale = Math.min(1, maxSize / CANVAS_SIZE);
         
-        CANVAS_SIZE = size;
-        CELL_SIZE = size / GRID_COUNT;
-        
-        this.canvas.width = size;
-        this.canvas.height = size;
+        this.canvas.style.transform = `scale(${scale})`;
+        this.canvas.style.transformOrigin = 'top left';
     },
 
     /**
