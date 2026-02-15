@@ -81,6 +81,9 @@ const Game = {
             clearInterval(this.loopTimer);
         }
 
+        // TASK-005: 开始时清空粒子
+        ParticleSystem.clear();
+
         Input.consumeDirection();
 
         this.loopTimer = setInterval(this.tick.bind(this), TICK_INTERVAL);
@@ -127,6 +130,9 @@ const Game = {
 
         // 7. 吃到食物后加分并生成新食物
         if (ateFood) {
+            // TASK-005: 吃食物时生成粒子特效
+            ParticleSystem.spawn(foodPos.x, foodPos.y);
+
             Score.add();
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
@@ -180,15 +186,20 @@ const Game = {
 
     /**
      * 渲染当前帧
+     * 渲染顺序: 背景 → 墙壁 → 食物 → 蛇 → 粒子（TASK-005）
      * @returns {void}
      */
     render() {
         Renderer.drawBackground();
+        Renderer.drawWalls();
         const foodPos = Food.getPosition();
         if (foodPos) {
             Renderer.drawFood(foodPos);
         }
         Renderer.drawSnake(Snake.segments, Snake.direction);
+        // TASK-005: 更新并渲染粒子
+        ParticleSystem.update();
+        ParticleSystem.render(Renderer.ctx);
     },
 
     /**
