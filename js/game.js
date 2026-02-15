@@ -86,6 +86,7 @@ const Game = {
         Score.reset();
         Score.updateDisplay(this.scoreEl, this.highScoreEl);
         Food.spawn(function(point) { return Snake.occupies(point); });
+        ParticleSystem.clear();
 
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
@@ -171,8 +172,9 @@ const Game = {
             return;
         }
 
-        // 7. 吃到食物后加分并生成新食物
+        // 7. 吃到食物后加分、触发粒子并生成新食物
         if (ateFood) {
+            ParticleSystem.spawn(foodPos.x, foodPos.y);
             Score.add();
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
@@ -225,16 +227,19 @@ const Game = {
     },
 
     /**
-     * 渲染当前帧
+     * 渲染当前帧（渲染顺序：背景 → 墙壁 → 食物 → 蛇 → 粒子）
      * @returns {void}
      */
     render() {
         Renderer.drawBackground();
+        Renderer.drawWalls();
         const foodPos = Food.getPosition();
         if (foodPos) {
             Renderer.drawFood(foodPos);
         }
         Renderer.drawSnake(Snake.segments, Snake.direction);
+        ParticleSystem.update();
+        ParticleSystem.render(Renderer.ctx);
     },
 
     /**
