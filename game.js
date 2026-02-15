@@ -9,13 +9,13 @@
 
 // ========== 常量 ==========
 
-/** @type {number} 网格数量（固定 50×50，二期扩展） */
-const GRID_COUNT = 50;
+/** @type {number} 网格数量（40×40） */
+const GRID_COUNT = 40;
 
-/** @type {number} 每格像素尺寸（固定 20px，保持一期视觉大小） */
-const CELL_SIZE = 20;
+/** @type {number} 每格像素尺寸（25px） */
+const CELL_SIZE = 25;
 
-/** @type {number} 画布像素尺寸（固定 1000px = 50 × 20） */
+/** @type {number} 画布像素尺寸（1000px = 40 × 25） */
 const CANVAS_SIZE = GRID_COUNT * CELL_SIZE;
 
 /** @type {number} 游戏刷新间隔（毫秒） */
@@ -61,14 +61,14 @@ const Snake = {
 
     /**
      * 初始化蛇到默认位置和方向
-     * 蛇头 (25,25)，蛇身 (24,25), (23,25)，方向向右（50×50地图中心）
+     * 蛇头 (20,20)，蛇身 (19,20), (18,20)，方向向右（40×40地图中心）
      * @returns {void}
      */
     init() {
         this.segments = [
-            { x: 25, y: 25 },
-            { x: 24, y: 25 },
-            { x: 23, y: 25 }
+            { x: 20, y: 20 },
+            { x: 19, y: 20 },
+            { x: 18, y: 20 }
         ];
         this.direction = Direction.RIGHT;
     },
