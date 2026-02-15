@@ -35,6 +35,16 @@
             width: 100%;
             padding: 8px 0;
             font-size: clamp(16px, 2vw, 32px);
+            gap: 8px;
+        }
+
+        /* 静音按钮（TASK-003） */
+        .icon-btn {
+            background: transparent;
+            border: none;
+            font-size: clamp(20px, 3vw, 32px);
+            cursor: pointer;
+            padding: 4px;
         }
 
         #score { color: #FFD700; }
@@ -47,6 +57,44 @@
             height: auto;
             border: 2px solid #16213e;
             border-radius: 4px;
+            touch-action: none; /* 禁止触摸滚动/缩放（TASK-002） */
+        }
+
+        /* 虚拟方向键（TASK-002）— 默认隐藏，< 768px 显示 */
+        .dpad-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 16px;
+            gap: 4px;
+        }
+        .dpad-middle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .dpad-btn {
+            width: clamp(48px, 12vw, 64px);
+            height: clamp(48px, 12vw, 64px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: clamp(18px, 4vw, 24px);
+            cursor: pointer;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .dpad-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .dpad-center {
+            width: clamp(48px, 12vw, 64px);
+            height: clamp(48px, 12vw, 64px);
+        }
+        @media (max-width: 767px) {
+            .dpad-container { display: flex; }
         }
     </style>
 </head>
@@ -56,11 +104,22 @@
         <div class="score-panel">
             <span id="score">分数: 0</span>
             <span id="highScore">最高分: 0</span>
+            <button id="muteBtn" class="icon-btn" aria-label="静音切换">🔊</button>
         </div>
         <!-- 游戏画布（动态尺寸，由JS计算） -->
         <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <!-- 虚拟方向键（TASK-002）— 仅 < 768px 显示 -->
+        <div id="dpad" class="dpad-container">
+            <button class="dpad-btn dpad-up" data-dir="up" aria-label="上">▲</button>
+            <div class="dpad-middle">
+                <button class="dpad-btn dpad-left" data-dir="left" aria-label="左">◀</button>
+                <div class="dpad-center"></div>
+                <button class="dpad-btn dpad-right" data-dir="right" aria-label="右">▶</button>
+            </div>
+            <button class="dpad-btn dpad-down" data-dir="down" aria-label="下">▼</button>
+        </div>
     </div>
 
-    <script src="game.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
