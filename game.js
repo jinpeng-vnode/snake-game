@@ -9,13 +9,13 @@
 
 // ========== 常量 ==========
 
-/** @type {number} 网格数量（40×40） */
-const GRID_COUNT = 40;
+/** @type {number} 网格数量（20×20） */
+const GRID_COUNT = 20;
 
-/** @type {number} 每格像素尺寸（25px） */
-const CELL_SIZE = 25;
+/** @type {number} 每格像素尺寸（30px） */
+const CELL_SIZE = 30;
 
-/** @type {number} 画布像素尺寸（1000px = 40 × 25） */
+/** @type {number} 画布像素尺寸（600px = 20 × 30） */
 const CANVAS_SIZE = GRID_COUNT * CELL_SIZE;
 
 /** @type {number} 游戏刷新间隔（毫秒） */
@@ -66,9 +66,9 @@ const Snake = {
      */
     init() {
         this.segments = [
-            { x: 20, y: 20 },
-            { x: 19, y: 20 },
-            { x: 18, y: 20 }
+            { x: 10, y: 10 },
+            { x: 9, y: 10 },
+            { x: 8, y: 10 }
         ];
         this.direction = Direction.RIGHT;
     },
