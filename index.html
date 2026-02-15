@@ -21,51 +21,27 @@
             font-family: Arial, sans-serif;
         }
 
-        /* 游戏容器（L2-TASK-008: 400px→600px） */
+        /* 游戏容器（动态宽度） */
         .game-container {
-            width: 600px;
+            max-width: 90vw;
         }
 
-        /* 分数面板 — Canvas 上方的 HTML 元素（L2-TASK-009: 卡片样式 + 渐变文字） */
+        /* 分数面板（动态宽度，UI规格：与画布一致） */
         .score-panel {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            width: 600px;
-            height: 50px;
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
-            margin-bottom: 10px;
+            width: 100%;
+            padding: 8px 0;
+            color: #ffffff;
+            font-size: clamp(16px, 2vw, 32px);
         }
 
-        .score-panel span {
-            background: linear-gradient(90deg, #00ff88, #00d4ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-weight: bold;
-            font-size: 22px;
-        }
-
-        /* 游戏画布（L2-TASK-008: 添加响应式支持） */
+        /* 游戏画布 */
         #gameCanvas {
             display: block;
             border: 2px solid #16213e;
             border-radius: 4px;
-            max-width: 90vw;
-            height: auto;
-        }
-
-        /* 响应式布局：小屏幕自动缩放（L2-TASK-008） */
-        @media (max-width: 680px) {
-            .game-container {
-                width: 90vw;
-            }
-            .score-panel {
-                width: 100%;
-            }
         }
     </style>
 </head>
@@ -76,8 +52,8 @@
             <span id="score">分数: 0</span>
             <span id="highScore">最高分: 0</span>
         </div>
-        <!-- 游戏画布（L2-TASK-008: 400×400→600×600） -->
-        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <!-- 游戏画布（动态尺寸，由JS计算） -->
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
     </div>
 
     <script src="game.js"></script>

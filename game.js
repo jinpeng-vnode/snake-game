@@ -9,16 +9,16 @@
 
 // ========== 常量 ==========
 
-/** @type {number} 画布像素尺寸（L2-TASK-008: 400→600） */
-const CANVAS_SIZE = 600;
+/** @type {number} 画布像素尺寸（动态计算，400-800px） */
+let CANVAS_SIZE = 400;
 
-/** @type {number} 网格数量（每行/每列）（L2-TASK-008: 20→30） */
-const GRID_COUNT = 30;
+/** @type {number} 网格数量（固定 50×50，用户决策） */
+const GRID_COUNT = 50;
 
-/** @type {number} 每格像素尺寸 */
-const CELL_SIZE = 20;
+/** @type {number} 每格像素尺寸（动态计算） */
+let CELL_SIZE = 8;
 
-/** @type {number} 游戏刷新间隔（毫秒）（L2-TASK-008: 200→180，提升流畅度） */
+/** @type {number} 游戏刷新间隔（毫秒） */
 const TICK_INTERVAL = 180;
 
 /** @type {number} 每个食物的分值 */
@@ -61,14 +61,14 @@ const Snake = {
 
     /**
      * 初始化蛇到默认位置和方向
-     * 蛇头 (15,15)，蛇身 (14,15), (13,15)，方向向右（L2-TASK-008: 调整到30×30地图中心）
+     * 蛇头 (25,25)，蛇身 (24,25), (23,25)，方向向右（50×50地图中心）
      * @returns {void}
      */
     init() {
         this.segments = [
-            { x: 15, y: 15 },
-            { x: 14, y: 15 },
-            { x: 13, y: 15 }
+            { x: 25, y: 25 },
+            { x: 24, y: 25 },
+            { x: 23, y: 25 }
         ];
         this.direction = Direction.RIGHT;
     },
@@ -288,14 +288,14 @@ const Score = {
     },
 
     /**
-     * 更新 HTML 分数面板显示（L2-TASK-009: 添加 emoji）
+     * 更新 HTML 分数面板显示
      * @param {HTMLElement} scoreEl - 当前分数 DOM 元素
      * @param {HTMLElement} highScoreEl - 最高分 DOM 元素
      * @returns {void}
      */
     updateDisplay(scoreEl, highScoreEl) {
-        scoreEl.textContent = '🏆 分数: ' + this.current;
-        highScoreEl.textContent = '⭐ 最高分: ' + this.high;
+        scoreEl.textContent = '分数: ' + this.current;
+        highScoreEl.textContent = '最高分: ' + this.high;
     }
 };
 
@@ -377,284 +377,270 @@ const Renderer = {
     /** @type {CanvasRenderingContext2D|null} */
     ctx: null,
 
+    /** @type {HTMLCanvasElement|null} */
+    canvas: null,
+
     /**
-     * 初始化渲染器
+     * 初始化渲染器并计算画布尺寸
      * @param {HTMLCanvasElement} canvas
      * @returns {void}
      */
     init(canvas) {
+        this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
+        this.updateCanvasSize();
+        
+        // 监听窗口缩放（防抖200ms）
+        let resizeTimer = null;
+        window.addEventListener('resize', () => {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                this.updateCanvasSize();
+                if (window.Game) window.Game.render();
+            }, 200);
+        });
     },
 
     /**
-     * 清空画布并绘制网格背景（L2-TASK-009: 径向渐变 + 虚线网格）
-     * 背景色径向渐变 #1a1a2e → #0f0f23，网格线虚线 rgba(255,255,255,0.05)
+     * 计算并更新画布尺寸（UI规格：400-800px，50的倍数）
+     * @returns {void}
+     */
+    updateCanvasSize() {
+        const viewport = Math.min(window.innerWidth, window.innerHeight);
+        const base = viewport * 0.8;
+        const size = Math.max(400, Math.min(800, Math.floor(base / 50) * 50));
+        
+        CANVAS_SIZE = size;
+        CELL_SIZE = size / GRID_COUNT;
+        
+        this.canvas.width = size;
+        this.canvas.height = size;
+    },
+
+    /**
+     * 绘制棋盘格背景（UI规格：交替色棋盘格）
      * @returns {void}
      */
     drawBackground() {
         const ctx = this.ctx;
         
-        // 径向渐变背景（中心到边缘）
-        const gradient = ctx.createRadialGradient(
-            CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0,
-            CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2
-        );
-        gradient.addColorStop(0, '#1a1a2e');
-        gradient.addColorStop(1, '#0f0f23');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        
-        // 虚线网格
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 4]);
-        
-        for (let i = 0; i <= GRID_COUNT; i++) {
-            const pos = i * CELL_SIZE;
-            // 垂直线
-            ctx.beginPath();
-            ctx.moveTo(pos, 0);
-            ctx.lineTo(pos, CANVAS_SIZE);
-            ctx.stroke();
-            // 水平线
-            ctx.beginPath();
-            ctx.moveTo(0, pos);
-            ctx.lineTo(CANVAS_SIZE, pos);
-            ctx.stroke();
+        for (let y = 0; y < GRID_COUNT; y++) {
+            for (let x = 0; x < GRID_COUNT; x++) {
+                ctx.fillStyle = (x + y) % 2 === 0 ? '#1a1a2e' : '#16213e';
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
         }
-        
-        ctx.setLineDash([]); // 重置虚线
     },
 
     /**
-     * 绘制蛇（L2-TASK-009: 渐变色 #00ff88 → #00aa44 + 蛇头高光）
-     * 蛇身从头到尾渐变，18×18px 带 2px 圆角
+     * 绘制蛇（UI规格：渐变色 #4CAF50 → #81C784 + 蛇头眼睛）
      * @param {{x: number, y: number}[]} segments
+     * @param {{dx: number, dy: number}} direction - 蛇头方向
      * @returns {void}
      */
-    drawSnake(segments) {
+    drawSnake(segments, direction) {
         const ctx = this.ctx;
         const len = segments.length;
         
         segments.forEach((seg, index) => {
-            // 计算渐变色（从头 #00ff88 到尾 #00aa44）
-            const ratio = index / Math.max(len - 1, 1);
-            const r = Math.round(0 + (0 - 0) * ratio);
-            const g = Math.round(255 + (170 - 255) * ratio);
-            const b = Math.round(136 + (68 - 136) * ratio);
-            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-            
-            // 绘制蛇身段（圆角矩形）
             const x = seg.x * CELL_SIZE + 1;
             const y = seg.y * CELL_SIZE + 1;
             const size = CELL_SIZE - 2;
-            const radius = 2;
             
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + size - radius, y);
-            ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
-            ctx.lineTo(x + size, y + size - radius);
-            ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
-            ctx.lineTo(x + radius, y + size);
-            ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
-            ctx.lineTo(x, y + radius);
-            ctx.quadraticCurveTo(x, y, x + radius, y);
-            ctx.closePath();
-            ctx.fill();
-            
-            // 蛇头高光
             if (index === 0) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                // 蛇头：圆角矩形 + 眼睛
+                const radius = CELL_SIZE * 0.3;
+                ctx.fillStyle = '#4CAF50';
                 ctx.beginPath();
-                ctx.arc(x + size / 2, y + size / 2, 4, 0, Math.PI * 2);
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + size - radius, y);
+                ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+                ctx.lineTo(x + size, y + size - radius);
+                ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+                ctx.lineTo(x + radius, y + size);
+                ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.fill();
+                
+                // 眼睛（根据方向调整位置）
+                const centerX = x + size / 2;
+                const centerY = y + size / 2;
+                const eyeRadius = CELL_SIZE * 0.08;
+                let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
+                
+                if (direction.dy === -1) { // UP
+                    leftEyeX = centerX - CELL_SIZE * 0.15;
+                    leftEyeY = centerY - CELL_SIZE * 0.2;
+                    rightEyeX = centerX + CELL_SIZE * 0.15;
+                    rightEyeY = centerY - CELL_SIZE * 0.2;
+                } else if (direction.dy === 1) { // DOWN
+                    leftEyeX = centerX - CELL_SIZE * 0.15;
+                    leftEyeY = centerY + CELL_SIZE * 0.2;
+                    rightEyeX = centerX + CELL_SIZE * 0.15;
+                    rightEyeY = centerY + CELL_SIZE * 0.2;
+                } else if (direction.dx === -1) { // LEFT
+                    leftEyeX = centerX - CELL_SIZE * 0.2;
+                    leftEyeY = centerY - CELL_SIZE * 0.15;
+                    rightEyeX = centerX - CELL_SIZE * 0.2;
+                    rightEyeY = centerY + CELL_SIZE * 0.15;
+                } else { // RIGHT
+                    leftEyeX = centerX + CELL_SIZE * 0.2;
+                    leftEyeY = centerY - CELL_SIZE * 0.15;
+                    rightEyeX = centerX + CELL_SIZE * 0.2;
+                    rightEyeY = centerY + CELL_SIZE * 0.15;
+                }
+                
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(rightEyeX, rightEyeY, eyeRadius, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // 蛇身：渐变色 #4CAF50 → #81C784
+                const progress = index / Math.max(len - 1, 1);
+                const r = Math.round(76 + (129 - 76) * progress);
+                const g = Math.round(175 + (199 - 175) * progress);
+                const b = Math.round(80 + (132 - 80) * progress);
+                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                
+                const radius = CELL_SIZE * 0.2;
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + size - radius, y);
+                ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+                ctx.lineTo(x + size, y + size - radius);
+                ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+                ctx.lineTo(x + radius, y + size);
+                ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
                 ctx.fill();
             }
         });
     },
 
     /**
-     * 绘制食物（L2-TASK-010: 呼吸动画 + 渐变填充）
-     * 半径 6-10px 呼吸动画，渐变填充 #ff6b6b → #ee5a52
+     * 绘制食物（UI规格：苹果造型 = 主体 + 高光 + 茎 + 叶子）
      * @param {{x: number, y: number}} position
-     * @param {number} timestamp - 当前时间戳（毫秒）
      * @returns {void}
      */
-    drawFood(position, timestamp) {
+    drawFood(position) {
         const ctx = this.ctx;
         const centerX = position.x * CELL_SIZE + CELL_SIZE / 2;
         const centerY = position.y * CELL_SIZE + CELL_SIZE / 2;
         
-        // 呼吸动画：半径 6-10px，周期 1 秒
-        const radius = 8 + 2 * Math.sin(timestamp / 500);
-        
-        // 渐变填充
-        const gradient = ctx.createRadialGradient(
-            centerX, centerY, 0,
-            centerX, centerY, radius
-        );
-        gradient.addColorStop(0, '#ff6b6b');
-        gradient.addColorStop(1, '#ee5a52');
-        
-        ctx.fillStyle = gradient;
+        // 苹果主体
+        ctx.fillStyle = '#F44336';
         ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, CELL_SIZE * 0.4, 0, Math.PI * 2);
         ctx.fill();
+        
+        // 高光
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(centerX - CELL_SIZE * 0.15, centerY - CELL_SIZE * 0.15, CELL_SIZE * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 茎
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(
+            centerX - CELL_SIZE * 0.04,
+            centerY - CELL_SIZE * 0.55,
+            CELL_SIZE * 0.08,
+            CELL_SIZE * 0.15
+        );
+        
+        // 叶子（椭圆，旋转30度）
+        ctx.save();
+        ctx.translate(centerX + CELL_SIZE * 0.1, centerY - CELL_SIZE * 0.35);
+        ctx.rotate(30 * Math.PI / 180);
+        ctx.fillStyle = '#4CAF50';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, CELL_SIZE * 0.2, CELL_SIZE * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     },
 
     /**
-     * 绘制开始界面（L2-TASK-009: 渐变标题 + 副标题 + 按钮样式）
-     * "贪吃蛇" 64px 渐变 + "SNAKE GAME" 20px + 按钮样式提示
+     * 绘制开始界面（UI规格：动态字号）
      * @returns {void}
      */
     drawReadyScreen() {
         const ctx = this.ctx;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
-        // 渐变标题
-        const titleGradient = ctx.createLinearGradient(
-            CANVAS_SIZE / 2 - 150, 0,
-            CANVAS_SIZE / 2 + 150, 0
-        );
-        titleGradient.addColorStop(0, '#00ff88');
-        titleGradient.addColorStop(1, '#00d4ff');
-        
-        ctx.fillStyle = titleGradient;
-        ctx.font = 'bold 64px Arial, sans-serif';
-        ctx.shadowColor = 'rgba(0, 255, 136, 0.5)';
-        ctx.shadowBlur = 20;
-        ctx.fillText('贪吃蛇', CANVAS_SIZE / 2, 200);
-        ctx.shadowBlur = 0;
-        
-        // 副标题
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = '20px Arial, sans-serif';
-        ctx.fillText('SNAKE GAME', CANVAS_SIZE / 2, 250);
-        
-        // 按钮样式提示
-        ctx.strokeStyle = '#00ff88';
-        ctx.lineWidth = 2;
-        ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-        const btnX = CANVAS_SIZE / 2 - 120;
-        const btnY = 320;
-        const btnW = 240;
-        const btnH = 50;
-        ctx.beginPath();
-        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
-        ctx.fill();
-        ctx.stroke();
-        
         ctx.fillStyle = '#ffffff';
-        ctx.font = '20px Arial, sans-serif';
-        ctx.fillText('按空格键开始游戏', CANVAS_SIZE / 2, 345);
+
+        // 标题（字号 = 画布尺寸 / 8.33）
+        ctx.font = `bold ${Math.floor(CANVAS_SIZE / 8.33)}px Arial, sans-serif`;
+        ctx.fillText('贪吃蛇', CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 40);
+
+        // 提示（字号 = 画布尺寸 / 20）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 20)}px Arial, sans-serif`;
+        ctx.fillText('按空格键开始游戏', CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 20);
     },
 
     /**
-     * 绘制游戏结束界面（L2-TASK-009: 渐变遮罩 + 渐变文字 + 按钮样式）
-     * 半透明渐变遮罩 + "游戏结束" + 最终分数 + 重新开始提示
+     * 绘制游戏结束界面（UI规格：动态字号）
      * @param {number} finalScore
      * @returns {void}
      */
     drawGameOverScreen(finalScore) {
         const ctx = this.ctx;
         
-        // 渐变遮罩
-        const maskGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_SIZE);
-        maskGradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
-        maskGradient.addColorStop(1, 'rgba(26, 26, 46, 0.9)');
-        ctx.fillStyle = maskGradient;
+        // 遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
         
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
-        // 渐变标题
-        const titleGradient = ctx.createLinearGradient(
-            CANVAS_SIZE / 2 - 100, 0,
-            CANVAS_SIZE / 2 + 100, 0
-        );
-        titleGradient.addColorStop(0, '#00ff88');
-        titleGradient.addColorStop(1, '#00d4ff');
-        
-        ctx.fillStyle = titleGradient;
-        ctx.font = 'bold 48px Arial, sans-serif';
-        ctx.fillText('游戏结束', CANVAS_SIZE / 2, 220);
-        
-        // 分数（渐变）
-        ctx.fillStyle = titleGradient;
-        ctx.font = 'bold 28px Arial, sans-serif';
-        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 280);
-        
-        // 按钮样式提示
-        ctx.strokeStyle = '#00ff88';
-        ctx.lineWidth = 2;
-        ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-        const btnX = CANVAS_SIZE / 2 - 120;
-        const btnY = 340;
-        const btnW = 240;
-        const btnH = 50;
-        ctx.beginPath();
-        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
-        ctx.fill();
-        ctx.stroke();
-        
         ctx.fillStyle = '#ffffff';
-        ctx.font = '18px Arial, sans-serif';
-        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 365);
+
+        // 标题（字号 = 画布尺寸 / 11.11）
+        ctx.font = `bold ${Math.floor(CANVAS_SIZE / 11.11)}px Arial, sans-serif`;
+        ctx.fillText('游戏结束', CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 60);
+
+        // 最终分数（字号 = 画布尺寸 / 16.67）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 16.67)}px Arial, sans-serif`;
+        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+
+        // 重新开始提示（字号 = 画布尺寸 / 22.22）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 22.22)}px Arial, sans-serif`;
+        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 60);
     },
 
     /**
-     * 绘制通关界面（L2-TASK-009: 渐变遮罩 + 渐变文字 + 按钮样式）
+     * 绘制通关界面（UI规格：动态字号）
      * @param {number} finalScore
      * @returns {void}
      */
     drawWinScreen(finalScore) {
         const ctx = this.ctx;
         
-        // 渐变遮罩
-        const maskGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_SIZE);
-        maskGradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
-        maskGradient.addColorStop(1, 'rgba(26, 26, 46, 0.9)');
-        ctx.fillStyle = maskGradient;
+        // 遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
         
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
-        // 渐变标题
-        const titleGradient = ctx.createLinearGradient(
-            CANVAS_SIZE / 2 - 100, 0,
-            CANVAS_SIZE / 2 + 100, 0
-        );
-        titleGradient.addColorStop(0, '#00ff88');
-        titleGradient.addColorStop(1, '#00d4ff');
-        
-        ctx.fillStyle = titleGradient;
-        ctx.font = 'bold 48px Arial, sans-serif';
-        ctx.fillText('恭喜通关', CANVAS_SIZE / 2, 220);
-        
-        // 分数（渐变）
-        ctx.fillStyle = titleGradient;
-        ctx.font = 'bold 28px Arial, sans-serif';
-        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 280);
-        
-        // 按钮样式提示
-        ctx.strokeStyle = '#00ff88';
-        ctx.lineWidth = 2;
-        ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-        const btnX = CANVAS_SIZE / 2 - 120;
-        const btnY = 340;
-        const btnW = 240;
-        const btnH = 50;
-        ctx.beginPath();
-        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
-        ctx.fill();
-        ctx.stroke();
-        
         ctx.fillStyle = '#ffffff';
-        ctx.font = '18px Arial, sans-serif';
-        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 365);
+
+        // 标题（字号 = 画布尺寸 / 11.11）
+        ctx.font = `bold ${Math.floor(CANVAS_SIZE / 11.11)}px Arial, sans-serif`;
+        ctx.fillText('恭喜通关', CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 60);
+
+        // 最终分数（字号 = 画布尺寸 / 16.67）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 16.67)}px Arial, sans-serif`;
+        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+
+        // 重新开始提示（字号 = 画布尺寸 / 22.22）
+        ctx.font = `${Math.floor(CANVAS_SIZE / 22.22)}px Arial, sans-serif`;
+        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 60);
     }
 };
 
@@ -673,11 +659,8 @@ const Game = {
     /** @type {HTMLElement|null} 最高分 DOM 元素 */
     highScoreEl: null,
 
-    /** @type {number|null} 动画帧 ID（L2-TASK-010） */
+    /** @type {number|null} 动画帧 ID */
     animationFrameId: null,
-
-    /** @type {number} 游戏结束界面透明度（L2-TASK-010） */
-    gameOverAlpha: 0,
 
     /**
      * 初始化游戏：获取 DOM 元素，初始化所有子模块，绘制开始界面
@@ -706,7 +689,7 @@ const Game = {
         Renderer.drawBackground();
         Renderer.drawReadyScreen();
 
-        // 启动渲染循环（L2-TASK-010: 用于食物动画）
+        // 启动渲染循环
         this.startRenderLoop();
     },
 
@@ -734,8 +717,6 @@ const Game = {
         Score.reset();
         Score.updateDisplay(this.scoreEl, this.highScoreEl);
         Food.spawn(function(point) { return Snake.occupies(point); });
-        ParticleSystem.clear(); // L2-TASK-010: 清空粒子
-        this.gameOverAlpha = 0;  // L2-TASK-010: 重置透明度
 
         // 清除可能存在的旧定时器
         if (this.loopTimer !== null) {
@@ -794,9 +775,6 @@ const Game = {
             Score.add();
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
-            // L2-TASK-010: 生成粒子特效
-            ParticleSystem.spawn(foodPos.x, foodPos.y);
-
             // 检测通关
             if (Snake.getLength() === GRID_COUNT * GRID_COUNT) {
                 this.win();
@@ -821,73 +799,57 @@ const Game = {
     },
 
     /**
-     * 结束游戏（L2-TASK-010: 准备淡入动画）
+     * 结束游戏
      * @returns {void}
      */
     gameOver() {
         this.state = GameState.GAME_OVER;
-        this.gameOverAlpha = 0; // 重置透明度，准备淡入
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
         }
-        // 渲染最后一帧（蛇和食物保持最后位置）
         this.render();
-        // 淡入动画由 renderLoop 处理
     },
 
     /**
-     * 通关处理（L2-TASK-010: 准备淡入动画）
+     * 通关处理
      * @returns {void}
      */
     win() {
         this.state = GameState.WIN;
-        this.gameOverAlpha = 0; // 重置透明度，准备淡入
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
         }
         this.render();
-        // 淡入动画由 renderLoop 处理
     },
 
     /**
-     * 渲染当前帧：背景 → 食物 → 蛇 → 粒子（L2-TASK-010）
+     * 渲染当前帧：背景 → 食物 → 蛇
      * @returns {void}
      */
     render() {
         Renderer.drawBackground();
         const foodPos = Food.getPosition();
         if (foodPos) {
-            Renderer.drawFood(foodPos, performance.now());
+            Renderer.drawFood(foodPos);
         }
-        Renderer.drawSnake(Snake.segments);
-        ParticleSystem.render(Renderer.ctx); // L2-TASK-010: 渲染粒子
+        Renderer.drawSnake(Snake.segments, Snake.direction);
     },
 
     /**
-     * 启动渲染循环（L2-TASK-010: 用于动画）
+     * 启动渲染循环（简化版）
      * @returns {void}
      */
     startRenderLoop() {
         const renderFrame = () => {
             if (this.state === GameState.READY) {
-                // 开始界面：只渲染食物动画（如果有）
                 Renderer.drawBackground();
                 Renderer.drawReadyScreen();
-            } else if (this.state === GameState.PLAYING) {
-                // 游戏中：更新粒子
-                ParticleSystem.update();
-            } else if (this.state === GameState.GAME_OVER || this.state === GameState.WIN) {
-                // 结束界面：淡入动画
-                if (this.gameOverAlpha < 1) {
-                    this.gameOverAlpha += 0.05; // 20 帧 ≈ 333ms
-                    if (this.state === GameState.GAME_OVER) {
-                        this.renderGameOverOverlay();
-                    } else {
-                        this.renderWinOverlay();
-                    }
-                }
+            } else if (this.state === GameState.GAME_OVER) {
+                Renderer.drawGameOverScreen(Score.current);
+            } else if (this.state === GameState.WIN) {
+                Renderer.drawWinScreen(Score.current);
             }
             this.animationFrameId = requestAnimationFrame(renderFrame);
         };
@@ -895,7 +857,7 @@ const Game = {
     },
 
     /**
-     * 停止渲染循环（L2-TASK-010）
+     * 停止渲染循环
      * @returns {void}
      */
     stopRenderLoop() {
@@ -903,30 +865,6 @@ const Game = {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
-    },
-
-    /**
-     * 渲染游戏结束遮罩（带淡入效果）（L2-TASK-010）
-     * @returns {void}
-     */
-    renderGameOverOverlay() {
-        const ctx = Renderer.ctx;
-        ctx.save();
-        ctx.globalAlpha = this.gameOverAlpha;
-        Renderer.drawGameOverScreen(Score.current);
-        ctx.restore();
-    },
-
-    /**
-     * 渲染通关遮罩（带淡入效果）（L2-TASK-010）
-     * @returns {void}
-     */
-    renderWinOverlay() {
-        const ctx = Renderer.ctx;
-        ctx.save();
-        ctx.globalAlpha = this.gameOverAlpha;
-        Renderer.drawWinScreen(Score.current);
-        ctx.restore();
     }
 };
 
