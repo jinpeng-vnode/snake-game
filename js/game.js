@@ -43,7 +43,8 @@ const Game = {
         Score.init();
         Input.init(
             function(_dir) { /* Input 内部已缓存 pendingDirection */ },
-            this.handleAction.bind(this)
+            this.handleAction.bind(this),
+            this.togglePause.bind(this)
         );
 
         // TASK-003: 初始化音效系统
@@ -64,6 +65,13 @@ const Game = {
         Renderer.drawBackground();
         Renderer.drawReadyScreen();
 
+        // 页面失焦自动暂停（TASK-004）
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.state === GameState.PLAYING) {
+                this.pause();
+            }
+        });
+
         this.startRenderLoop();
     },
 
@@ -76,6 +84,8 @@ const Game = {
             this.state === GameState.GAME_OVER ||
             this.state === GameState.WIN) {
             this.start();
+        } else if (this.state === GameState.PAUSED) {
+            this.resume();
         }
     },
 
@@ -94,6 +104,7 @@ const Game = {
         Score.reset();
         Score.updateDisplay(this.scoreEl, this.highScoreEl);
         Food.spawn(function(point) { return Snake.occupies(point); });
+        ParticleSystem.clear();
 
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
@@ -104,6 +115,42 @@ const Game = {
         this.loopTimer = setInterval(this.tick.bind(this), TICK_INTERVAL);
 
         this.render();
+    },
+
+    /**
+     * 暂停游戏（TASK-004）
+     * @returns {void}
+     */
+    pause() {
+        if (this.state !== GameState.PLAYING) return;
+        this.state = GameState.PAUSED;
+        if (this.loopTimer !== null) {
+            clearInterval(this.loopTimer);
+            this.loopTimer = null;
+        }
+    },
+
+    /**
+     * 恢复游戏（TASK-004）
+     * @returns {void}
+     */
+    resume() {
+        if (this.state !== GameState.PAUSED) return;
+        this.state = GameState.PLAYING;
+        Input.consumeDirection();
+        this.loopTimer = setInterval(this.tick.bind(this), TICK_INTERVAL);
+    },
+
+    /**
+     * 切换暂停/恢复（TASK-004）
+     * @returns {void}
+     */
+    togglePause() {
+        if (this.state === GameState.PLAYING) {
+            this.pause();
+        } else if (this.state === GameState.PAUSED) {
+            this.resume();
+        }
     },
 
     /**
@@ -143,11 +190,11 @@ const Game = {
             return;
         }
 
-        // 7. 吃到食物后加分并生成新食物
+        // 7. 吃到食物后加分、触发粒子并生成新食物
         if (ateFood) {
             // TASK-003: 播放吃食物音效
             SoundManager.playEat();
-
+            ParticleSystem.spawn(foodPos.x, foodPos.y);
             Score.add();
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
@@ -209,20 +256,23 @@ const Game = {
     },
 
     /**
-     * 渲染当前帧
+     * 渲染当前帧（渲染顺序：背景 → 墙壁 → 食物 → 蛇 → 粒子）
      * @returns {void}
      */
     render() {
         Renderer.drawBackground();
+        Renderer.drawWalls();
         const foodPos = Food.getPosition();
         if (foodPos) {
             Renderer.drawFood(foodPos);
         }
         Renderer.drawSnake(Snake.segments, Snake.direction);
+        ParticleSystem.update();
+        ParticleSystem.render(Renderer.ctx);
     },
 
     /**
-     * 启动渲染循环
+     * 启动渲染循环（含 PAUSED 分支 — TASK-004）
      * @returns {void}
      */
     startRenderLoop() {
@@ -230,6 +280,9 @@ const Game = {
             if (this.state === GameState.READY) {
                 Renderer.drawBackground();
                 Renderer.drawReadyScreen();
+            } else if (this.state === GameState.PAUSED) {
+                this.render();
+                Renderer.drawPausedScreen();
             } else if (this.state === GameState.GAME_OVER) {
                 this.render();
                 Renderer.drawGameOverScreen(Score.current);

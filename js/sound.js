@@ -41,7 +41,7 @@ const SoundManager = {
         try {
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         } catch (_e) {
-            // AudioContext 创建失败，静默降级
+            // AudioContext 不可用，静默降级
             this.ctx = null;
         }
     },
@@ -57,7 +57,6 @@ const SoundManager = {
             const gain = this.ctx.createGain();
             osc.connect(gain);
             gain.connect(this.ctx.destination);
-
             osc.type = 'square';
             const now = this.ctx.currentTime;
             // 短促上升音调：300Hz → 600Hz，持续 0.1s
@@ -65,11 +64,10 @@ const SoundManager = {
             osc.frequency.linearRampToValueAtTime(600, now + 0.1);
             gain.gain.setValueAtTime(0.3, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.1);
-
             osc.start(now);
             osc.stop(now + 0.1);
         } catch (_e) {
-            // 播放失败静默降级
+            // 静默降级
         }
     },
 
@@ -84,7 +82,6 @@ const SoundManager = {
             const gain = this.ctx.createGain();
             osc.connect(gain);
             gain.connect(this.ctx.destination);
-
             osc.type = 'sawtooth';
             const now = this.ctx.currentTime;
             // 低沉下降音调：400Hz → 100Hz，持续 0.5s
@@ -92,11 +89,10 @@ const SoundManager = {
             osc.frequency.linearRampToValueAtTime(100, now + 0.5);
             gain.gain.setValueAtTime(0.3, now);
             gain.gain.linearRampToValueAtTime(0, now + 0.5);
-
             osc.start(now);
             osc.stop(now + 0.5);
         } catch (_e) {
-            // 播放失败静默降级
+            // 静默降级
         }
     },
 
@@ -111,12 +107,9 @@ const SoundManager = {
             this.bgmGain = this.ctx.createGain();
             this.bgmOscillator.connect(this.bgmGain);
             this.bgmGain.connect(this.ctx.destination);
-
-            // 简单低音循环
             this.bgmOscillator.type = 'sine';
             this.bgmOscillator.frequency.setValueAtTime(80, this.ctx.currentTime);
             this.bgmGain.gain.setValueAtTime(0.05, this.ctx.currentTime);
-
             this.bgmOscillator.start();
         } catch (_e) {
             this.bgmOscillator = null;
@@ -129,14 +122,15 @@ const SoundManager = {
      * @returns {void}
      */
     stopBgm() {
-        if (!this.bgmOscillator) return;
-        try {
-            this.bgmOscillator.stop();
-        } catch (_e) {
-            // 已停止则忽略
+        if (this.bgmOscillator) {
+            try {
+                this.bgmOscillator.stop();
+            } catch (_e) {
+                // 已停止则忽略
+            }
+            this.bgmOscillator = null;
+            this.bgmGain = null;
         }
-        this.bgmOscillator = null;
-        this.bgmGain = null;
     },
 
     /**
@@ -150,13 +144,11 @@ const SoundManager = {
         } catch (_e) {
             // localStorage 不可用则不持久化
         }
-
         // 更新按钮图标
         const btn = document.getElementById('muteBtn');
         if (btn) {
             btn.textContent = this.muted ? '🔇' : '🔊';
         }
-
         // 静音时停止 BGM，取消静音时恢复
         if (this.muted) {
             this.stopBgm();
