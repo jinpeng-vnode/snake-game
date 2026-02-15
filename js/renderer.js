@@ -189,6 +189,25 @@ const Renderer = {
     },
 
     /**
+     * 绘制墙壁边界（TASK-005）
+     * UI规格: design/ui/L1-TASK-007-游戏界面优化.md 第七节
+     * 画布四周内边缘 4px #3a3a5c 灰紫色矩形
+     * @returns {void}
+     */
+    drawWalls() {
+        const ctx = this.ctx;
+        ctx.fillStyle = '#3a3a5c';
+        // 上
+        ctx.fillRect(0, 0, CANVAS_SIZE, 4);
+        // 下
+        ctx.fillRect(0, CANVAS_SIZE - 4, CANVAS_SIZE, 4);
+        // 左
+        ctx.fillRect(0, 0, 4, CANVAS_SIZE);
+        // 右
+        ctx.fillRect(CANVAS_SIZE - 4, 0, 4, CANVAS_SIZE);
+    },
+
+    /**
      * 绘制开始界面
      * @returns {void}
      */
