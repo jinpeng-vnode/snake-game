@@ -21,28 +21,40 @@
             font-family: Arial, sans-serif;
         }
 
-        /* 游戏容器 */
+        /* 游戏容器（L2-TASK-008: 400px→600px） */
         .game-container {
-            width: 400px;
+            width: 600px;
         }
 
-        /* 分数面板 — Canvas 上方的 HTML 元素 */
+        /* 分数面板 — Canvas 上方的 HTML 元素（L2-TASK-008: 400px→600px） */
         .score-panel {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            width: 400px;
+            width: 600px;
             height: 40px;
             padding: 8px 0;
             color: #ffffff;
             font-size: 20px;
         }
 
-        /* 游戏画布 */
+        /* 游戏画布（L2-TASK-008: 添加响应式支持） */
         #gameCanvas {
             display: block;
             border: 2px solid #16213e;
             border-radius: 4px;
+            max-width: 90vw;
+            height: auto;
+        }
+
+        /* 响应式布局：小屏幕自动缩放（L2-TASK-008） */
+        @media (max-width: 680px) {
+            .game-container {
+                width: 90vw;
+            }
+            .score-panel {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -53,8 +65,8 @@
             <span id="score">分数: 0</span>
             <span id="highScore">最高分: 0</span>
         </div>
-        <!-- 游戏画布 -->
-        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <!-- 游戏画布（L2-TASK-008: 400×400→600×600） -->
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
     </div>
 
     <script src="game.js"></script>
