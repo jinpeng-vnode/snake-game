@@ -35,10 +35,20 @@
             width: 100%;
             padding: 8px 0;
             font-size: clamp(16px, 2vw, 32px);
+            gap: 8px;
         }
 
         #score { color: #FFD700; }
         #highScore { color: #C0C0C0; }
+
+        /* 静音按钮（TASK-003） */
+        .icon-btn {
+            background: transparent;
+            border: none;
+            font-size: clamp(20px, 3vw, 32px);
+            cursor: pointer;
+            padding: 4px;
+        }
 
         /* 游戏画布（宽度跟随容器，高度自动保持比例） */
         #gameCanvas {
@@ -56,6 +66,7 @@
         <div class="score-panel">
             <span id="score">分数: 0</span>
             <span id="highScore">最高分: 0</span>
+            <button id="muteBtn" class="icon-btn" aria-label="静音切换">🔊</button>
         </div>
         <!-- 游戏画布（动态尺寸，由JS计算） -->
         <canvas id="gameCanvas" width="400" height="400"></canvas>
