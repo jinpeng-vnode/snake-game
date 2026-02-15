@@ -857,6 +857,8 @@ const Game = {
 
     /**
      * 启动渲染循环（简化版）
+     * 注意：GAME_OVER/WIN 状态需先绘制完整游戏画面再叠加遮罩，
+     * 避免每帧重复叠加半透明遮罩导致界面越来越黑、文字重叠。
      * @returns {void}
      */
     startRenderLoop() {
@@ -865,8 +867,10 @@ const Game = {
                 Renderer.drawBackground();
                 Renderer.drawReadyScreen();
             } else if (this.state === GameState.GAME_OVER) {
+                this.render();
                 Renderer.drawGameOverScreen(Score.current);
             } else if (this.state === GameState.WIN) {
+                this.render();
                 Renderer.drawWinScreen(Score.current);
             }
             this.animationFrameId = requestAnimationFrame(renderFrame);
