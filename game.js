@@ -393,30 +393,7 @@ const Renderer = {
         this.canvas.width = CANVAS_SIZE;
         this.canvas.height = CANVAS_SIZE;
         
-        // 初始缩放
-        this.updateCanvasScale();
-        
-        // 监听窗口缩放（防抖200ms）
-        let resizeTimer = null;
-        window.addEventListener('resize', () => {
-            if (resizeTimer) clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(() => {
-                this.updateCanvasScale();
-            }, 200);
-        });
-    },
-
-    /**
-     * 使用 CSS transform scale 缩放画布适应屏幕
-     * @returns {void}
-     */
-    updateCanvasScale() {
-        const viewport = Math.min(window.innerWidth, window.innerHeight);
-        const maxSize = viewport * 0.8;
-        const scale = Math.min(1, maxSize / CANVAS_SIZE);
-        
-        this.canvas.style.transform = `scale(${scale})`;
-        this.canvas.style.transformOrigin = 'top left';
+        // 画布缩放由 CSS width:100% 处理，无需 JS 干预
     },
 
     /**
