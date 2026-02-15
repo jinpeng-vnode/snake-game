@@ -299,6 +299,78 @@ const Score = {
     }
 };
 
+// ========== ParticleSystem 模块（L2-TASK-010: 粒子特效系统） ==========
+
+const ParticleSystem = {
+    /** @type {Array<{x: number, y: number, vx: number, vy: number, alpha: number, life: number}>} */
+    particles: [],
+    
+    /**
+     * 在指定位置生成粒子
+     * @param {number} gridX - 网格 X 坐标
+     * @param {number} gridY - 网格 Y 坐标
+     * @returns {void}
+     */
+    spawn(gridX, gridY) {
+        const centerX = gridX * CELL_SIZE + CELL_SIZE / 2;
+        const centerY = gridY * CELL_SIZE + CELL_SIZE / 2;
+        const count = 6 + Math.floor(Math.random() * 3); // 6-8 个粒子
+        
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+            const speed = 2 + Math.random() * 2; // 2-4 px/frame
+            this.particles.push({
+                x: centerX,
+                y: centerY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                alpha: 1,
+                life: 15 // 15 帧 ≈ 300ms (at 60fps)
+            });
+        }
+    },
+    
+    /**
+     * 更新所有粒子状态
+     * @returns {void}
+     */
+    update() {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            p.alpha = p.life / 15; // 线性淡出
+            
+            if (p.life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+    },
+    
+    /**
+     * 渲染所有粒子
+     * @param {CanvasRenderingContext2D} ctx
+     * @returns {void}
+     */
+    render(ctx) {
+        this.particles.forEach(p => {
+            ctx.fillStyle = `rgba(255, 107, 107, ${p.alpha})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    },
+    
+    /**
+     * 清空所有粒子
+     * @returns {void}
+     */
+    clear() {
+        this.particles = [];
+    }
+};
+
 // ========== Renderer 模块 ==========
 
 const Renderer = {
@@ -402,18 +474,31 @@ const Renderer = {
     },
 
     /**
-     * 绘制食物
-     * 红色圆形 #F44336，直径 16px，居中于网格
+     * 绘制食物（L2-TASK-010: 呼吸动画 + 渐变填充）
+     * 半径 6-10px 呼吸动画，渐变填充 #ff6b6b → #ee5a52
      * @param {{x: number, y: number}} position
+     * @param {number} timestamp - 当前时间戳（毫秒）
      * @returns {void}
      */
-    drawFood(position) {
+    drawFood(position, timestamp) {
         const ctx = this.ctx;
-        ctx.fillStyle = '#F44336';
         const centerX = position.x * CELL_SIZE + CELL_SIZE / 2;
         const centerY = position.y * CELL_SIZE + CELL_SIZE / 2;
+        
+        // 呼吸动画：半径 6-10px，周期 1 秒
+        const radius = 8 + 2 * Math.sin(timestamp / 500);
+        
+        // 渐变填充
+        const gradient = ctx.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, radius
+        );
+        gradient.addColorStop(0, '#ff6b6b');
+        gradient.addColorStop(1, '#ee5a52');
+        
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
         ctx.fill();
     },
 
@@ -588,6 +673,12 @@ const Game = {
     /** @type {HTMLElement|null} 最高分 DOM 元素 */
     highScoreEl: null,
 
+    /** @type {number|null} 动画帧 ID（L2-TASK-010） */
+    animationFrameId: null,
+
+    /** @type {number} 游戏结束界面透明度（L2-TASK-010） */
+    gameOverAlpha: 0,
+
     /**
      * 初始化游戏：获取 DOM 元素，初始化所有子模块，绘制开始界面
      * @returns {void}
@@ -614,6 +705,9 @@ const Game = {
         // 绘制开始界面
         Renderer.drawBackground();
         Renderer.drawReadyScreen();
+
+        // 启动渲染循环（L2-TASK-010: 用于食物动画）
+        this.startRenderLoop();
     },
 
     /**
@@ -640,6 +734,8 @@ const Game = {
         Score.reset();
         Score.updateDisplay(this.scoreEl, this.highScoreEl);
         Food.spawn(function(point) { return Snake.occupies(point); });
+        ParticleSystem.clear(); // L2-TASK-010: 清空粒子
+        this.gameOverAlpha = 0;  // L2-TASK-010: 重置透明度
 
         // 清除可能存在的旧定时器
         if (this.loopTimer !== null) {
@@ -698,6 +794,9 @@ const Game = {
             Score.add();
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
+            // L2-TASK-010: 生成粒子特效
+            ParticleSystem.spawn(foodPos.x, foodPos.y);
+
             // 检测通关
             if (Snake.getLength() === GRID_COUNT * GRID_COUNT) {
                 this.win();
@@ -722,45 +821,112 @@ const Game = {
     },
 
     /**
-     * 结束游戏
+     * 结束游戏（L2-TASK-010: 准备淡入动画）
      * @returns {void}
      */
     gameOver() {
         this.state = GameState.GAME_OVER;
+        this.gameOverAlpha = 0; // 重置透明度，准备淡入
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
         }
         // 渲染最后一帧（蛇和食物保持最后位置）
         this.render();
-        Renderer.drawGameOverScreen(Score.current);
+        // 淡入动画由 renderLoop 处理
     },
 
     /**
-     * 通关处理
+     * 通关处理（L2-TASK-010: 准备淡入动画）
      * @returns {void}
      */
     win() {
         this.state = GameState.WIN;
+        this.gameOverAlpha = 0; // 重置透明度，准备淡入
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
         }
         this.render();
-        Renderer.drawWinScreen(Score.current);
+        // 淡入动画由 renderLoop 处理
     },
 
     /**
-     * 渲染当前帧：背景 → 食物 → 蛇
+     * 渲染当前帧：背景 → 食物 → 蛇 → 粒子（L2-TASK-010）
      * @returns {void}
      */
     render() {
         Renderer.drawBackground();
         const foodPos = Food.getPosition();
         if (foodPos) {
-            Renderer.drawFood(foodPos);
+            Renderer.drawFood(foodPos, performance.now());
         }
         Renderer.drawSnake(Snake.segments);
+        ParticleSystem.render(Renderer.ctx); // L2-TASK-010: 渲染粒子
+    },
+
+    /**
+     * 启动渲染循环（L2-TASK-010: 用于动画）
+     * @returns {void}
+     */
+    startRenderLoop() {
+        const renderFrame = () => {
+            if (this.state === GameState.READY) {
+                // 开始界面：只渲染食物动画（如果有）
+                Renderer.drawBackground();
+                Renderer.drawReadyScreen();
+            } else if (this.state === GameState.PLAYING) {
+                // 游戏中：更新粒子
+                ParticleSystem.update();
+            } else if (this.state === GameState.GAME_OVER || this.state === GameState.WIN) {
+                // 结束界面：淡入动画
+                if (this.gameOverAlpha < 1) {
+                    this.gameOverAlpha += 0.05; // 20 帧 ≈ 333ms
+                    if (this.state === GameState.GAME_OVER) {
+                        this.renderGameOverOverlay();
+                    } else {
+                        this.renderWinOverlay();
+                    }
+                }
+            }
+            this.animationFrameId = requestAnimationFrame(renderFrame);
+        };
+        this.animationFrameId = requestAnimationFrame(renderFrame);
+    },
+
+    /**
+     * 停止渲染循环（L2-TASK-010）
+     * @returns {void}
+     */
+    stopRenderLoop() {
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    },
+
+    /**
+     * 渲染游戏结束遮罩（带淡入效果）（L2-TASK-010）
+     * @returns {void}
+     */
+    renderGameOverOverlay() {
+        const ctx = Renderer.ctx;
+        ctx.save();
+        ctx.globalAlpha = this.gameOverAlpha;
+        Renderer.drawGameOverScreen(Score.current);
+        ctx.restore();
+    },
+
+    /**
+     * 渲染通关遮罩（带淡入效果）（L2-TASK-010）
+     * @returns {void}
+     */
+    renderWinOverlay() {
+        const ctx = Renderer.ctx;
+        ctx.save();
+        ctx.globalAlpha = this.gameOverAlpha;
+        Renderer.drawWinScreen(Score.current);
+        ctx.restore();
     }
 };
 
