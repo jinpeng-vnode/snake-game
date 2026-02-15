@@ -12,8 +12,8 @@
 /** @type {number} 画布像素尺寸（动态计算，400-800px） */
 let CANVAS_SIZE = 400;
 
-/** @type {number} 网格数量（固定 50×50，用户决策） */
-const GRID_COUNT = 50;
+/** @type {number} 网格数量（固定 20×20，用户决策） */
+const GRID_COUNT = 20;
 
 /** @type {number} 每格像素尺寸（动态计算） */
 let CELL_SIZE = 8;
@@ -402,13 +402,13 @@ const Renderer = {
     },
 
     /**
-     * 计算并更新画布尺寸（UI规格：400-800px，50的倍数）
+     * 计算并更新画布尺寸（UI规格：400-800px，20的倍数）
      * @returns {void}
      */
     updateCanvasSize() {
         const viewport = Math.min(window.innerWidth, window.innerHeight);
         const base = viewport * 0.8;
-        const size = Math.max(400, Math.min(800, Math.floor(base / 50) * 50));
+        const size = Math.max(400, Math.min(800, Math.floor(base / 20) * 20));
         
         CANVAS_SIZE = size;
         CELL_SIZE = size / GRID_COUNT;
@@ -433,7 +433,7 @@ const Renderer = {
     },
 
     /**
-     * 绘制蛇（UI规格：渐变色 #4CAF50 → #81C784 + 蛇头眼睛）
+     * 绘制蛇（UI规格：渐变色 #4CAF50 → #81C784 + 蛇头眼睛 + 蛇尾略小）
      * @param {{x: number, y: number}[]} segments
      * @param {{dx: number, dy: number}} direction - 蛇头方向
      * @returns {void}
@@ -445,7 +445,13 @@ const Renderer = {
         segments.forEach((seg, index) => {
             const x = seg.x * CELL_SIZE + 1;
             const y = seg.y * CELL_SIZE + 1;
-            const size = CELL_SIZE - 2;
+            let size = CELL_SIZE - 2;
+            
+            // 蛇尾略小（最后一节缩小 20%）
+            if (index === len - 1) {
+                const shrink = CELL_SIZE * 0.1;
+                size = CELL_SIZE - 2 - shrink * 2;
+            }
             
             if (index === 0) {
                 // 蛇头：圆角矩形 + 眼睛
@@ -508,16 +514,26 @@ const Renderer = {
                 ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
                 
                 const radius = CELL_SIZE * 0.2;
+                
+                // 蛇尾需要调整绘制位置（居中）
+                let drawX = x;
+                let drawY = y;
+                if (index === len - 1) {
+                    const shrink = CELL_SIZE * 0.1;
+                    drawX = x + shrink;
+                    drawY = y + shrink;
+                }
+                
                 ctx.beginPath();
-                ctx.moveTo(x + radius, y);
-                ctx.lineTo(x + size - radius, y);
-                ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
-                ctx.lineTo(x + size, y + size - radius);
-                ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
-                ctx.lineTo(x + radius, y + size);
-                ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
-                ctx.lineTo(x, y + radius);
-                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.moveTo(drawX + radius, drawY);
+                ctx.lineTo(drawX + size - radius, drawY);
+                ctx.quadraticCurveTo(drawX + size, drawY, drawX + size, drawY + radius);
+                ctx.lineTo(drawX + size, drawY + size - radius);
+                ctx.quadraticCurveTo(drawX + size, drawY + size, drawX + size - radius, drawY + size);
+                ctx.lineTo(drawX + radius, drawY + size);
+                ctx.quadraticCurveTo(drawX, drawY + size, drawX, drawY + size - radius);
+                ctx.lineTo(drawX, drawY + radius);
+                ctx.quadraticCurveTo(drawX, drawY, drawX + radius, drawY);
                 ctx.closePath();
                 ctx.fill();
             }
