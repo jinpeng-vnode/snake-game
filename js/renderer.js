@@ -147,45 +147,136 @@ const Renderer = {
     },
 
     /**
-     * 绘制食物（苹果造型）
+     * 根据食物类型绘制不同形状（TASK-006）
+     * UI规格: design/ui/L1-TASK-007-游戏界面优化.md 第六节
      * @param {{x: number, y: number}} position
+     * @param {object} foodType - FoodType 枚举值
+     * @param {boolean} blinking - true 表示当前帧应隐藏
      * @returns {void}
      */
-    drawFood(position) {
+    drawFood(position, foodType, blinking) {
+        if (blinking) return;
+
         const ctx = this.ctx;
-        const centerX = position.x * CELL_SIZE + CELL_SIZE / 2;
-        const centerY = position.y * CELL_SIZE + CELL_SIZE / 2;
+        const cx = position.x * CELL_SIZE + CELL_SIZE / 2;
+        const cy = position.y * CELL_SIZE + CELL_SIZE / 2;
 
-        // 苹果主体
-        ctx.fillStyle = '#F44336';
+        ctx.fillStyle = foodType.color;
         ctx.beginPath();
-        ctx.arc(centerX, centerY, CELL_SIZE * 0.4, 0, Math.PI * 2);
-        ctx.fill();
 
-        // 高光
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.beginPath();
-        ctx.arc(centerX - CELL_SIZE * 0.15, centerY - CELL_SIZE * 0.15, CELL_SIZE * 0.12, 0, Math.PI * 2);
-        ctx.fill();
+        switch (foodType.shape) {
+            case 'circle':
+                ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+                ctx.fill();
+                break;
 
-        // 茎
-        ctx.fillStyle = '#8B4513';
-        ctx.fillRect(
-            centerX - CELL_SIZE * 0.04,
-            centerY - CELL_SIZE * 0.55,
-            CELL_SIZE * 0.08,
-            CELL_SIZE * 0.15
-        );
+            case 'diamond':
+                ctx.moveTo(cx, cy - 8);
+                ctx.lineTo(cx + 8, cy);
+                ctx.lineTo(cx, cy + 8);
+                ctx.lineTo(cx - 8, cy);
+                ctx.closePath();
+                ctx.fill();
+                break;
 
-        // 叶子
-        ctx.save();
-        ctx.translate(centerX + CELL_SIZE * 0.1, centerY - CELL_SIZE * 0.35);
-        ctx.rotate(30 * Math.PI / 180);
-        ctx.fillStyle = '#4CAF50';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, CELL_SIZE * 0.2, CELL_SIZE * 0.12, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+            case 'triangle':
+                ctx.moveTo(cx, cy - 7);
+                ctx.lineTo(cx - 8, cy + 7);
+                ctx.lineTo(cx + 8, cy + 7);
+                ctx.closePath();
+                ctx.fill();
+                break;
+
+            case 'star': {
+                const outerR = 9, innerR = 4, spikes = 5;
+                for (let i = 0; i < spikes * 2; i++) {
+                    const r = i % 2 === 0 ? outerR : innerR;
+                    const angle = -Math.PI / 2 + (Math.PI / spikes) * i;
+                    const px = cx + Math.cos(angle) * r;
+                    const py = cy + Math.sin(angle) * r;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                break;
+            }
+
+            case 'square':
+                ctx.fillRect(cx - 7, cy - 7, 14, 14);
+                break;
+        }
+    },
+
+    /**
+     * 绘制效果状态指示器（TASK-006）
+     * UI规格: design/ui/L1-TASK-007-游戏界面优化.md 第八节
+     * @param {Array<{type: string, remaining: number}>} effects
+     * @returns {void}
+     */
+    drawEffectIndicators(effects) {
+        if (effects.length === 0) return;
+
+        const ctx = this.ctx;
+        const y = 12;
+        const paddingH = 6;
+        const paddingV = 2;
+        const gap = 8;
+        const fontSize = 12;
+
+        // 效果类型映射
+        const effectConfig = {
+            speed:  { prefix: '⚡ 加速', color: '#FF9800' },
+            slow:   { prefix: '🐢 减速', color: '#2196F3' },
+            double: { prefix: '✨ 双倍', color: '#FFD700' }
+        };
+
+        ctx.font = fontSize + 'px Arial';
+
+        // 计算每个标签的文字和宽度
+        const labels = effects.map(e => {
+            const config = effectConfig[e.type];
+            if (!config) return null;
+            const seconds = Math.ceil(e.remaining / 1000);
+            const text = config.prefix + ' ' + seconds + 's';
+            const width = ctx.measureText(text).width + paddingH * 2;
+            return { text, width, color: config.color };
+        }).filter(Boolean);
+
+        if (labels.length === 0) return;
+
+        // 计算总宽度和起始 X
+        const totalWidth = labels.reduce((sum, l) => sum + l.width, 0) + gap * (labels.length - 1);
+        let x = (CANVAS_SIZE - totalWidth) / 2;
+
+        // 逐个绘制标签
+        for (const label of labels) {
+            const h = fontSize + paddingV * 2;
+
+            // 背景圆角矩形
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.beginPath();
+            const r = 4;
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + label.width - r, y);
+            ctx.quadraticCurveTo(x + label.width, y, x + label.width, y + r);
+            ctx.lineTo(x + label.width, y + h - r);
+            ctx.quadraticCurveTo(x + label.width, y + h, x + label.width - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+
+            // 文字
+            ctx.fillStyle = label.color;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(label.text, x + paddingH, y + paddingV);
+
+            x += label.width + gap;
+        }
     },
 
     /**
