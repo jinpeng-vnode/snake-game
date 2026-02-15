@@ -27,6 +27,9 @@ export const SCORE_PER_FOOD = 10;
 /** @type {string} localStorage 最高分存储键名 */
 export const HIGH_SCORE_KEY = 'snakeHighScore';
 
+/** @type {string} localStorage 静音状态键名（TASK-003） */
+export const MUTE_KEY = 'snakeMuted';
+
 // ========== 方向枚举 ==========
 
 /**
