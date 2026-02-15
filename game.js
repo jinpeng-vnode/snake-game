@@ -288,14 +288,14 @@ const Score = {
     },
 
     /**
-     * 更新 HTML 分数面板显示
+     * 更新 HTML 分数面板显示（L2-TASK-009: 添加 emoji）
      * @param {HTMLElement} scoreEl - 当前分数 DOM 元素
      * @param {HTMLElement} highScoreEl - 最高分 DOM 元素
      * @returns {void}
      */
     updateDisplay(scoreEl, highScoreEl) {
-        scoreEl.textContent = '分数: ' + this.current;
-        highScoreEl.textContent = '最高分: ' + this.high;
+        scoreEl.textContent = '🏆 分数: ' + this.current;
+        highScoreEl.textContent = '⭐ 最高分: ' + this.high;
     }
 };
 
@@ -315,18 +315,28 @@ const Renderer = {
     },
 
     /**
-     * 清空画布并绘制网格背景
-     * 背景色 #1a1a2e，网格线 #16213e
+     * 清空画布并绘制网格背景（L2-TASK-009: 径向渐变 + 虚线网格）
+     * 背景色径向渐变 #1a1a2e → #0f0f23，网格线虚线 rgba(255,255,255,0.05)
      * @returns {void}
      */
     drawBackground() {
         const ctx = this.ctx;
-        // 填充背景
-        ctx.fillStyle = '#1a1a2e';
+        
+        // 径向渐变背景（中心到边缘）
+        const gradient = ctx.createRadialGradient(
+            CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0,
+            CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2
+        );
+        gradient.addColorStop(0, '#1a1a2e');
+        gradient.addColorStop(1, '#0f0f23');
+        ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        // 绘制网格线
-        ctx.strokeStyle = '#16213e';
+        
+        // 虚线网格
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.lineWidth = 1;
+        ctx.setLineDash([2, 4]);
+        
         for (let i = 0; i <= GRID_COUNT; i++) {
             const pos = i * CELL_SIZE;
             // 垂直线
@@ -340,24 +350,34 @@ const Renderer = {
             ctx.lineTo(CANVAS_SIZE, pos);
             ctx.stroke();
         }
+        
+        ctx.setLineDash([]); // 重置虚线
     },
 
     /**
-     * 绘制蛇
-     * 蛇头 #388E3C，蛇身 #4CAF50，18×18px 带 2px 圆角
+     * 绘制蛇（L2-TASK-009: 渐变色 #00ff88 → #00aa44 + 蛇头高光）
+     * 蛇身从头到尾渐变，18×18px 带 2px 圆角
      * @param {{x: number, y: number}[]} segments
      * @returns {void}
      */
     drawSnake(segments) {
         const ctx = this.ctx;
+        const len = segments.length;
+        
         segments.forEach((seg, index) => {
-            ctx.fillStyle = index === 0 ? '#388E3C' : '#4CAF50';
-            // 每格内留 1px 间隙，绘制 18×18
+            // 计算渐变色（从头 #00ff88 到尾 #00aa44）
+            const ratio = index / Math.max(len - 1, 1);
+            const r = Math.round(0 + (0 - 0) * ratio);
+            const g = Math.round(255 + (170 - 255) * ratio);
+            const b = Math.round(136 + (68 - 136) * ratio);
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            
+            // 绘制蛇身段（圆角矩形）
             const x = seg.x * CELL_SIZE + 1;
             const y = seg.y * CELL_SIZE + 1;
             const size = CELL_SIZE - 2;
             const radius = 2;
-            // 绘制圆角矩形
+            
             ctx.beginPath();
             ctx.moveTo(x + radius, y);
             ctx.lineTo(x + size - radius, y);
@@ -370,6 +390,14 @@ const Renderer = {
             ctx.quadraticCurveTo(x, y, x + radius, y);
             ctx.closePath();
             ctx.fill();
+            
+            // 蛇头高光
+            if (index === 0) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(x + size / 2, y + size / 2, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
         });
     },
 
@@ -390,8 +418,8 @@ const Renderer = {
     },
 
     /**
-     * 绘制开始界面
-     * "贪吃蛇" 48px + "按空格键开始游戏" 20px
+     * 绘制开始界面（L2-TASK-009: 渐变标题 + 副标题 + 按钮样式）
+     * "贪吃蛇" 64px 渐变 + "SNAKE GAME" 20px + 按钮样式提示
      * @returns {void}
      */
     drawReadyScreen() {
@@ -399,71 +427,149 @@ const Renderer = {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // 标题
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '48px Arial, sans-serif';
-        ctx.fillText('贪吃蛇', CANVAS_SIZE / 2, 160);
-
-        // 提示
+        // 渐变标题
+        const titleGradient = ctx.createLinearGradient(
+            CANVAS_SIZE / 2 - 150, 0,
+            CANVAS_SIZE / 2 + 150, 0
+        );
+        titleGradient.addColorStop(0, '#00ff88');
+        titleGradient.addColorStop(1, '#00d4ff');
+        
+        ctx.fillStyle = titleGradient;
+        ctx.font = 'bold 64px Arial, sans-serif';
+        ctx.shadowColor = 'rgba(0, 255, 136, 0.5)';
+        ctx.shadowBlur = 20;
+        ctx.fillText('贪吃蛇', CANVAS_SIZE / 2, 200);
+        ctx.shadowBlur = 0;
+        
+        // 副标题
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.font = '20px Arial, sans-serif';
-        ctx.fillText('按空格键开始游戏', CANVAS_SIZE / 2, 220);
+        ctx.fillText('SNAKE GAME', CANVAS_SIZE / 2, 250);
+        
+        // 按钮样式提示
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
+        const btnX = CANVAS_SIZE / 2 - 120;
+        const btnY = 320;
+        const btnW = 240;
+        const btnH = 50;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '20px Arial, sans-serif';
+        ctx.fillText('按空格键开始游戏', CANVAS_SIZE / 2, 345);
     },
 
     /**
-     * 绘制游戏结束界面
-     * 半透明遮罩 + "游戏结束" + 最终分数 + 重新开始提示
+     * 绘制游戏结束界面（L2-TASK-009: 渐变遮罩 + 渐变文字 + 按钮样式）
+     * 半透明渐变遮罩 + "游戏结束" + 最终分数 + 重新开始提示
      * @param {number} finalScore
      * @returns {void}
      */
     drawGameOverScreen(finalScore) {
         const ctx = this.ctx;
-        // 遮罩
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        
+        // 渐变遮罩
+        const maskGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_SIZE);
+        maskGradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+        maskGradient.addColorStop(1, 'rgba(26, 26, 46, 0.9)');
+        ctx.fillStyle = maskGradient;
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
+        
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        
+        // 渐变标题
+        const titleGradient = ctx.createLinearGradient(
+            CANVAS_SIZE / 2 - 100, 0,
+            CANVAS_SIZE / 2 + 100, 0
+        );
+        titleGradient.addColorStop(0, '#00ff88');
+        titleGradient.addColorStop(1, '#00d4ff');
+        
+        ctx.fillStyle = titleGradient;
+        ctx.font = 'bold 48px Arial, sans-serif';
+        ctx.fillText('游戏结束', CANVAS_SIZE / 2, 220);
+        
+        // 分数（渐变）
+        ctx.fillStyle = titleGradient;
+        ctx.font = 'bold 28px Arial, sans-serif';
+        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 280);
+        
+        // 按钮样式提示
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
+        const btnX = CANVAS_SIZE / 2 - 120;
+        const btnY = 340;
+        const btnW = 240;
+        const btnH = 50;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+        ctx.fill();
+        ctx.stroke();
+        
         ctx.fillStyle = '#ffffff';
-
-        // 标题
-        ctx.font = '36px Arial, sans-serif';
-        ctx.fillText('游戏结束', CANVAS_SIZE / 2, 140);
-
-        // 最终分数
-        ctx.font = '24px Arial, sans-serif';
-        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 200);
-
-        // 重新开始提示
         ctx.font = '18px Arial, sans-serif';
-        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 260);
+        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 365);
     },
 
     /**
-     * 绘制通关界面
+     * 绘制通关界面（L2-TASK-009: 渐变遮罩 + 渐变文字 + 按钮样式）
      * @param {number} finalScore
      * @returns {void}
      */
     drawWinScreen(finalScore) {
         const ctx = this.ctx;
-        // 遮罩
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        
+        // 渐变遮罩
+        const maskGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_SIZE);
+        maskGradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+        maskGradient.addColorStop(1, 'rgba(26, 26, 46, 0.9)');
+        ctx.fillStyle = maskGradient;
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
+        
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        
+        // 渐变标题
+        const titleGradient = ctx.createLinearGradient(
+            CANVAS_SIZE / 2 - 100, 0,
+            CANVAS_SIZE / 2 + 100, 0
+        );
+        titleGradient.addColorStop(0, '#00ff88');
+        titleGradient.addColorStop(1, '#00d4ff');
+        
+        ctx.fillStyle = titleGradient;
+        ctx.font = 'bold 48px Arial, sans-serif';
+        ctx.fillText('恭喜通关', CANVAS_SIZE / 2, 220);
+        
+        // 分数（渐变）
+        ctx.fillStyle = titleGradient;
+        ctx.font = 'bold 28px Arial, sans-serif';
+        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 280);
+        
+        // 按钮样式提示
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
+        const btnX = CANVAS_SIZE / 2 - 120;
+        const btnY = 340;
+        const btnW = 240;
+        const btnH = 50;
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+        ctx.fill();
+        ctx.stroke();
+        
         ctx.fillStyle = '#ffffff';
-
-        // 标题
-        ctx.font = '36px Arial, sans-serif';
-        ctx.fillText('恭喜通关', CANVAS_SIZE / 2, 140);
-
-        // 最终分数
-        ctx.font = '24px Arial, sans-serif';
-        ctx.fillText('最终分数: ' + finalScore, CANVAS_SIZE / 2, 200);
-
-        // 重新开始提示
         ctx.font = '18px Arial, sans-serif';
-        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 260);
+        ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, 365);
     }
 };
 
