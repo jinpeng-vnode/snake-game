@@ -194,6 +194,7 @@ const Game = {
         if (ateFood) {
             // TASK-003: 播放吃食物音效
             SoundManager.playEat();
+            // TASK-005: 吃食物时生成粒子特效
             ParticleSystem.spawn(foodPos.x, foodPos.y);
             Score.add();
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
@@ -256,7 +257,8 @@ const Game = {
     },
 
     /**
-     * 渲染当前帧（渲染顺序：背景 → 墙壁 → 食物 → 蛇 → 粒子）
+     * 渲染当前帧
+     * 渲染顺序: 背景 → 墙壁 → 食物 → 蛇 → 粒子（TASK-005）
      * @returns {void}
      */
     render() {
@@ -267,6 +269,7 @@ const Game = {
             Renderer.drawFood(foodPos);
         }
         Renderer.drawSnake(Snake.segments, Snake.direction);
+        // TASK-005: 更新并渲染粒子
         ParticleSystem.update();
         ParticleSystem.render(Renderer.ctx);
     },
