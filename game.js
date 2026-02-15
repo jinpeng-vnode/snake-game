@@ -9,13 +9,13 @@
 
 // ========== 常量 ==========
 
-/** @type {number} 网格数量（固定 50×50，二期扩展） */
-const GRID_COUNT = 50;
+/** @type {number} 网格数量（20×20） */
+const GRID_COUNT = 20;
 
-/** @type {number} 每格像素尺寸（固定 20px，保持一期视觉大小） */
-const CELL_SIZE = 20;
+/** @type {number} 每格像素尺寸（30px） */
+const CELL_SIZE = 30;
 
-/** @type {number} 画布像素尺寸（固定 1000px = 50 × 20） */
+/** @type {number} 画布像素尺寸（600px = 20 × 30） */
 const CANVAS_SIZE = GRID_COUNT * CELL_SIZE;
 
 /** @type {number} 游戏刷新间隔（毫秒） */
@@ -61,14 +61,14 @@ const Snake = {
 
     /**
      * 初始化蛇到默认位置和方向
-     * 蛇头 (25,25)，蛇身 (24,25), (23,25)，方向向右（50×50地图中心）
+     * 蛇头 (20,20)，蛇身 (19,20), (18,20)，方向向右（40×40地图中心）
      * @returns {void}
      */
     init() {
         this.segments = [
-            { x: 25, y: 25 },
-            { x: 24, y: 25 },
-            { x: 23, y: 25 }
+            { x: 10, y: 10 },
+            { x: 9, y: 10 },
+            { x: 8, y: 10 }
         ];
         this.direction = Direction.RIGHT;
     },
@@ -834,6 +834,8 @@ const Game = {
 
     /**
      * 启动渲染循环（简化版）
+     * 注意：GAME_OVER/WIN 状态需先绘制完整游戏画面再叠加遮罩，
+     * 避免每帧重复叠加半透明遮罩导致界面越来越黑、文字重叠。
      * @returns {void}
      */
     startRenderLoop() {
@@ -842,8 +844,10 @@ const Game = {
                 Renderer.drawBackground();
                 Renderer.drawReadyScreen();
             } else if (this.state === GameState.GAME_OVER) {
+                this.render();
                 Renderer.drawGameOverScreen(Score.current);
             } else if (this.state === GameState.WIN) {
+                this.render();
                 Renderer.drawWinScreen(Score.current);
             }
             this.animationFrameId = requestAnimationFrame(renderFrame);
