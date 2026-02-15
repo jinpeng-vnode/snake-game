@@ -9,17 +9,17 @@
 
 // ========== 常量 ==========
 
-/** @type {number} 画布像素尺寸 */
-const CANVAS_SIZE = 400;
+/** @type {number} 画布像素尺寸（L2-TASK-008: 400→600） */
+const CANVAS_SIZE = 600;
 
-/** @type {number} 网格数量（每行/每列） */
-const GRID_COUNT = 20;
+/** @type {number} 网格数量（每行/每列）（L2-TASK-008: 20→30） */
+const GRID_COUNT = 30;
 
 /** @type {number} 每格像素尺寸 */
 const CELL_SIZE = 20;
 
-/** @type {number} 游戏刷新间隔（毫秒） */
-const TICK_INTERVAL = 200;
+/** @type {number} 游戏刷新间隔（毫秒）（L2-TASK-008: 200→180，提升流畅度） */
+const TICK_INTERVAL = 180;
 
 /** @type {number} 每个食物的分值 */
 const SCORE_PER_FOOD = 10;
@@ -61,14 +61,14 @@ const Snake = {
 
     /**
      * 初始化蛇到默认位置和方向
-     * 蛇头 (10,10)，蛇身 (9,10), (8,10)，方向向右
+     * 蛇头 (15,15)，蛇身 (14,15), (13,15)，方向向右（L2-TASK-008: 调整到30×30地图中心）
      * @returns {void}
      */
     init() {
         this.segments = [
-            { x: 10, y: 10 },
-            { x: 9,  y: 10 },
-            { x: 8,  y: 10 }
+            { x: 15, y: 15 },
+            { x: 14, y: 15 },
+            { x: 13, y: 15 }
         ];
         this.direction = Direction.RIGHT;
     },
