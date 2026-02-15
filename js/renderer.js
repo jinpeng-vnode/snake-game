@@ -253,6 +253,32 @@ const Renderer = {
 
         ctx.font = `${Math.floor(CANVAS_SIZE / 22.22)}px Arial, sans-serif`;
         ctx.fillText('按空格键重新开始', CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 60);
+    },
+
+    /**
+     * 绘制暂停遮罩（TASK-004）
+     * UI规格: design/ui/L1-TASK-007-游戏界面优化.md 第五节
+     * @returns {void}
+     */
+    drawPausedScreen() {
+        const ctx = this.ctx;
+
+        // 半透明遮罩
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+
+        // "已暂停" 36px
+        ctx.font = 'bold 36px Arial, sans-serif';
+        ctx.fillText('已暂停', CANVAS_SIZE / 2, CANVAS_SIZE * 0.4);
+
+        // 提示文字 18px，移动端显示不同文案
+        ctx.font = '18px Arial, sans-serif';
+        const hint = window.innerWidth < 768 ? '点击屏幕继续' : '按 ESC 或 P 键继续';
+        ctx.fillText(hint, CANVAS_SIZE / 2, CANVAS_SIZE * 0.4 + 50);
     }
 };
 
