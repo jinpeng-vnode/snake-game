@@ -1,5 +1,6 @@
 # 贪吃蛇游戏 GitHub Pages 自动部署
-# 当 main 分支有推送时，自动部署到 GitHub Pages
+# 当 main 分支有推送时，自动构建并部署到 GitHub Pages
+# 对应设计文档: design/L1-TASK-009-引擎重构架构设计.md 第三节
 
 name: Deploy to GitHub Pages
 
@@ -27,14 +28,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # 只上传游戏文件，排除设计文档等
-          path: .
+          path: dist
 
       - name: Deploy to GitHub Pages
         id: deployment
