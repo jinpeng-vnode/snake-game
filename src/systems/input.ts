@@ -17,6 +17,11 @@ interface InputCallbacks {
 
 let callbacks: InputCallbacks | null = null
 
+// 事件处理函数引用（用于 destroyInput 清理）
+let handleTouchStart: ((e: TouchEvent) => void) | null = null
+let handleTouchEnd: ((e: TouchEvent) => void) | null = null
+let dpadHandlers: { el: Element; fn: (e: Event) => void }[] = []
+
 /** 键盘按键到方向/动作的映射 */
 const KEY_MAP: Record<string, Direction> = {
   ArrowUp: Direction.UP, ArrowDown: Direction.DOWN,
@@ -46,6 +51,20 @@ export function initInput(cbs: InputCallbacks): void {
 /** 清理所有事件监听 */
 export function destroyInput(): void {
   document.removeEventListener('keydown', handleKeyDown)
+
+  const canvas = document.getElementById('gameCanvas')
+  if (canvas) {
+    if (handleTouchStart) canvas.removeEventListener('touchstart', handleTouchStart)
+    if (handleTouchEnd) canvas.removeEventListener('touchend', handleTouchEnd)
+  }
+  handleTouchStart = null
+  handleTouchEnd = null
+
+  for (const { el, fn } of dpadHandlers) {
+    el.removeEventListener('touchstart', fn)
+  }
+  dpadHandlers = []
+
   callbacks = null
 }
 
@@ -58,13 +77,13 @@ function initTouchSwipe(): void {
   let startX = 0
   let startY = 0
 
-  canvas.addEventListener('touchstart', (e: TouchEvent) => {
+  handleTouchStart = (e: TouchEvent) => {
     const touch = e.touches[0]
     startX = touch.clientX
     startY = touch.clientY
-  }, { passive: true })
+  }
 
-  canvas.addEventListener('touchend', (e: TouchEvent) => {
+  handleTouchEnd = (e: TouchEvent) => {
     if (!e.changedTouches.length) return
     const touch = e.changedTouches[0]
     const dx = touch.clientX - startX
@@ -79,7 +98,10 @@ function initTouchSwipe(): void {
     } else {
       callbacks?.onAction()
     }
-  })
+  }
+
+  canvas.addEventListener('touchstart', handleTouchStart, { passive: true })
+  canvas.addEventListener('touchend', handleTouchEnd)
 }
 
 // ========== 虚拟方向键 ==========
@@ -94,10 +116,12 @@ const DIR_MAP: Record<string, Direction> = {
 function initVirtualDpad(): void {
   const btns = document.querySelectorAll('.dpad-btn')
   btns.forEach(btn => {
-    btn.addEventListener('touchstart', (e) => {
+    const fn = (e: Event) => {
       e.preventDefault()
       const dir = DIR_MAP[(btn as HTMLElement).dataset.dir ?? '']
       if (dir) callbacks?.onDirection(dir)
-    })
+    }
+    btn.addEventListener('touchstart', fn)
+    dpadHandlers.push({ el: btn, fn })
   })
 }

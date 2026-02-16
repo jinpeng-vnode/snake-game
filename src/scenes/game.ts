@@ -29,6 +29,7 @@ export function startGame(app: Application): void {
   let tickTimer = 0
   let currentTickInterval = TICK_INTERVAL
   let lastTickTime = 0
+  let pendingDirection: Direction | null = null
 
   // DOM 元素
   const scoreEl = document.getElementById('score')!
@@ -81,6 +82,9 @@ export function startGame(app: Application): void {
     onDirection: (dir: Direction) => {
       if (state === GameState.PLAYING) {
         Snake.setDirection(dir)
+      } else if (state === GameState.READY || state === GameState.GAME_OVER || state === GameState.WIN) {
+        pendingDirection = dir
+        beginGame()
       }
     },
     onAction: () => {
@@ -249,6 +253,11 @@ export function startGame(app: Application): void {
     startBgm()
 
     Snake.createSnake(snakeLayer)
+    // 如果通过方向键启动，设置初始方向
+    if (pendingDirection) {
+      Snake.setDirection(pendingDirection)
+      pendingDirection = null
+    }
     resetScore()
     updateDisplay(scoreEl, highScoreEl)
     clearEffects()
