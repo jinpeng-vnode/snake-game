@@ -1,11 +1,12 @@
 /**
- * js/game.js — Game 主控制器
+ * js/game.js — Game 主控制器（TASK-006 扩展）
  * 对应设计文档: design/L1-TASK-002-007-手机版与体验优化总体设计.md 第五节 5.9
  *
  * 协调所有子模块，管理游戏生命周期。
+ * TASK-006: 集成食物类型系统、效果管理、动态 tick 间隔。
  */
 
-import { GameState, GRID_COUNT, TICK_INTERVAL } from './constants.js';
+import { GameState, GRID_COUNT, TICK_INTERVAL, FoodType } from './constants.js';
 import Snake from './snake.js';
 import Food from './food.js';
 import Input from './input.js';
@@ -13,6 +14,7 @@ import Score from './score.js';
 import Renderer from './renderer.js';
 import ParticleSystem from './particle.js';
 import SoundManager from './sound.js';
+import EffectManager from './effect.js';
 
 const Game = {
     /** @type {string} 当前游戏状态 */
@@ -30,6 +32,12 @@ const Game = {
     /** @type {number|null} 动画帧 ID */
     animationFrameId: null,
 
+    /** @type {number} 当前 tick 间隔（受效果影响）（TASK-006） */
+    currentTickInterval: TICK_INTERVAL,
+
+    /** @type {number} 上一次 tick 的时间戳（用于计算 deltaMs） */
+    lastTickTime: 0,
+
     /**
      * 初始化游戏：获取 DOM 元素，初始化所有子模块，绘制开始界面
      * @returns {void}
@@ -41,24 +49,26 @@ const Game = {
 
         Renderer.init(canvas);
         Score.init();
-        SoundManager.init();
         Input.init(
             function(_dir) { /* Input 内部已缓存 pendingDirection */ },
             this.handleAction.bind(this),
             this.togglePause.bind(this)
         );
 
-        Score.updateDisplay(this.scoreEl, this.highScoreEl);
+        // TASK-003: 初始化音效系统
+        SoundManager.init();
 
-        // 静音按钮绑定（TASK-003）
+        // TASK-003: 绑定静音按钮
         const muteBtn = document.getElementById('muteBtn');
         if (muteBtn) {
             muteBtn.textContent = SoundManager.isMuted() ? '🔇' : '🔊';
-            muteBtn.addEventListener('click', () => {
+            muteBtn.addEventListener('click', function() {
                 SoundManager.ensureContext();
                 SoundManager.toggleMute();
             });
         }
+
+        Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
         Renderer.drawBackground();
         Renderer.drawReadyScreen();
@@ -94,10 +104,20 @@ const Game = {
     start() {
         this.state = GameState.PLAYING;
 
+        // TASK-003: 确保 AudioContext 已创建，启动背景音乐
+        SoundManager.ensureContext();
+        SoundManager.startBgm();
+
         Snake.init();
         Score.reset();
         Score.updateDisplay(this.scoreEl, this.highScoreEl);
-        Food.spawn(function(point) { return Snake.occupies(point); });
+
+        // TASK-006: 清空效果，重置 tick 间隔
+        EffectManager.clear();
+        this.currentTickInterval = TICK_INTERVAL;
+
+        // 初始生成普通食物
+        Food.spawnType(function(point) { return Snake.occupies(point); }, FoodType.NORMAL);
         ParticleSystem.clear();
 
         if (this.loopTimer !== null) {
@@ -105,8 +125,8 @@ const Game = {
         }
 
         Input.consumeDirection();
-
-        this.loopTimer = setInterval(this.tick.bind(this), TICK_INTERVAL);
+        this.lastTickTime = Date.now();
+        this.loopTimer = setInterval(this.tick.bind(this), this.currentTickInterval);
 
         this.render();
     },
@@ -132,7 +152,8 @@ const Game = {
         if (this.state !== GameState.PAUSED) return;
         this.state = GameState.PLAYING;
         Input.consumeDirection();
-        this.loopTimer = setInterval(this.tick.bind(this), TICK_INTERVAL);
+        this.lastTickTime = Date.now();
+        this.loopTimer = setInterval(this.tick.bind(this), this.currentTickInterval);
     },
 
     /**
@@ -152,6 +173,22 @@ const Game = {
      * @returns {void}
      */
     tick() {
+        const now = Date.now();
+        const deltaMs = now - this.lastTickTime;
+        this.lastTickTime = now;
+
+        // TASK-006: 更新效果剩余时间
+        EffectManager.update(deltaMs);
+
+        // TASK-006: 更新食物限时倒计时，超时则生成普通食物
+        const expired = Food.updateTimer(deltaMs);
+        if (expired) {
+            Food.spawnType(function(point) { return Snake.occupies(point); }, FoodType.NORMAL);
+        }
+
+        // TASK-006: 动态调整 tick 间隔
+        this.updateTickInterval();
+
         // 1. 消费输入方向
         const dir = Input.consumeDirection();
         if (dir) {
@@ -175,8 +212,10 @@ const Game = {
         const foodPos = Food.getPosition();
         const ateFood = foodPos && newHead.x === foodPos.x && newHead.y === foodPos.y;
 
-        // 5. 移动蛇
-        Snake.move(ateFood);
+        // 5. 移动蛇（缩短类食物不生长，其他类型蛇身+1）
+        const foodType = Food.getType();
+        const shouldGrow = ateFood && foodType !== FoodType.SHRINK;
+        Snake.move(shouldGrow);
 
         // 6. 检测自身碰撞
         if (Snake.checkSelfCollision()) {
@@ -184,22 +223,55 @@ const Game = {
             return;
         }
 
-        // 7. 吃到食物后加分、触发粒子并生成新食物
+        // 7. 吃到食物后处理
         if (ateFood) {
+            // TASK-003: 播放吃食物音效
+            SoundManager.playEat();
+            // TASK-005: 生成粒子特效
             ParticleSystem.spawn(foodPos.x, foodPos.y);
-            Score.add();
+
+            // TASK-006: 按食物类型加分（支持双倍得分倍率）
+            Score.add(foodType.score, EffectManager.getScoreMultiplier());
             Score.updateDisplay(this.scoreEl, this.highScoreEl);
 
+            // TASK-006: 触发食物特殊效果
+            if (foodType.effect && foodType.effectDuration) {
+                EffectManager.add(foodType.effect, foodType.effectDuration);
+            }
+
+            // TASK-006: 缩短类食物处理
+            if (foodType === FoodType.SHRINK) {
+                Snake.shrink(2);
+            }
+
+            // 检测通关
             if (Snake.getLength() === GRID_COUNT * GRID_COUNT) {
                 this.win();
                 return;
             }
 
+            // TASK-006: 按概率生成下一个食物
             Food.spawn(function(point) { return Snake.occupies(point); });
         }
 
         // 8. 渲染
         this.render();
+    },
+
+    /**
+     * 动态调整 tick 间隔（TASK-006）
+     * 根据 EffectManager 的速度倍率调整，变化时重建定时器
+     * @returns {void}
+     */
+    updateTickInterval() {
+        const newInterval = Math.round(TICK_INTERVAL * EffectManager.getSpeedMultiplier());
+        if (newInterval !== this.currentTickInterval) {
+            this.currentTickInterval = newInterval;
+            if (this.loopTimer !== null) {
+                clearInterval(this.loopTimer);
+                this.loopTimer = setInterval(this.tick.bind(this), this.currentTickInterval);
+            }
+        }
     },
 
     /**
@@ -218,6 +290,14 @@ const Game = {
      */
     gameOver() {
         this.state = GameState.GAME_OVER;
+
+        // TASK-003: 播放游戏结束音效，停止背景音乐
+        SoundManager.playGameOver();
+        SoundManager.stopBgm();
+
+        // TASK-006: 清空效果
+        EffectManager.clear();
+
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
@@ -231,6 +311,13 @@ const Game = {
      */
     win() {
         this.state = GameState.WIN;
+
+        // TASK-003: 停止背景音乐
+        SoundManager.stopBgm();
+
+        // TASK-006: 清空效果
+        EffectManager.clear();
+
         if (this.loopTimer !== null) {
             clearInterval(this.loopTimer);
             this.loopTimer = null;
@@ -239,19 +326,29 @@ const Game = {
     },
 
     /**
-     * 渲染当前帧（渲染顺序：背景 → 墙壁 → 食物 → 蛇 → 粒子）
+     * 渲染当前帧
+     * 渲染顺序: 背景 → 墙壁 → 食物 → 蛇 → 粒子 → 效果指示器（TASK-006）
      * @returns {void}
      */
     render() {
         Renderer.drawBackground();
         Renderer.drawWalls();
+
+        // TASK-006: 根据食物类型和闪烁状态绘制
         const foodPos = Food.getPosition();
-        if (foodPos) {
-            Renderer.drawFood(foodPos);
+        const foodType = Food.getType();
+        if (foodPos && foodType) {
+            Renderer.drawFood(foodPos, foodType, Food.isBlinking());
         }
+
         Renderer.drawSnake(Snake.segments, Snake.direction);
+
+        // TASK-005: 更新并渲染粒子
         ParticleSystem.update();
         ParticleSystem.render(Renderer.ctx);
+
+        // TASK-006: 绘制效果状态指示器
+        Renderer.drawEffectIndicators(EffectManager.getActiveEffects());
     },
 
     /**

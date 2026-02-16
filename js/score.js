@@ -5,7 +5,7 @@
  * 管理当前分数、最高分、localStorage 持久化。
  */
 
-import { SCORE_PER_FOOD, HIGH_SCORE_KEY } from './constants.js';
+import { HIGH_SCORE_KEY } from './constants.js';
 
 const Score = {
     /** @type {number} 当前分数 */
@@ -32,11 +32,13 @@ const Score = {
     },
 
     /**
-     * 增加分数，超过最高分则更新并持久化
+     * 增加分数（支持倍率），超过最高分则更新并持久化（TASK-006 扩展）
+     * @param {number} baseScore - 基础分值
+     * @param {number} [multiplier=1] - 得分倍率
      * @returns {void}
      */
-    add() {
-        this.current += SCORE_PER_FOOD;
+    add(baseScore, multiplier = 1) {
+        this.current += Math.floor(baseScore * multiplier);
         if (this.current > this.high) {
             this.high = this.current;
             this.save();
