@@ -12,6 +12,7 @@ import Input from './input.js';
 import Score from './score.js';
 import Renderer from './renderer.js';
 import ParticleSystem from './particle.js';
+import SoundManager from './sound.js';
 
 const Game = {
     /** @type {string} 当前游戏状态 */
@@ -40,6 +41,7 @@ const Game = {
 
         Renderer.init(canvas);
         Score.init();
+        SoundManager.init();
         Input.init(
             function(_dir) { /* Input 内部已缓存 pendingDirection */ },
             this.handleAction.bind(this),
@@ -47,6 +49,16 @@ const Game = {
         );
 
         Score.updateDisplay(this.scoreEl, this.highScoreEl);
+
+        // 静音按钮绑定（TASK-003）
+        const muteBtn = document.getElementById('muteBtn');
+        if (muteBtn) {
+            muteBtn.textContent = SoundManager.isMuted() ? '🔇' : '🔊';
+            muteBtn.addEventListener('click', () => {
+                SoundManager.ensureContext();
+                SoundManager.toggleMute();
+            });
+        }
 
         Renderer.drawBackground();
         Renderer.drawReadyScreen();
