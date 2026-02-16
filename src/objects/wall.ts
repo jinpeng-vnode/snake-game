@@ -1,20 +1,23 @@
 /**
  * src/objects/wall.ts — 墙壁边界渲染
- * 对应设计文档: design/L1-TASK-009-引擎重构架构设计.md 第七节 7.4
- * UI规格: design/ui/L1-TASK-010-引擎重构视觉规格.md 第五节
+ * 对应设计文档: design/L1-TASK-020-PixiJS迁移架构设计.md 第九节 9.4、第十节 10.5
+ *
+ * 用 1 个 Graphics 对象绘制 4 条边（4px #3a3a5c 灰紫色）。
  */
 
-import k from '../engine'
+import { Container, Graphics } from 'pixi.js'
 import { CANVAS_SIZE } from '../constants'
 
-/** 绘制墙壁边界（4px #3a3a5c 灰紫色） */
-export function createWalls(): void {
+/** 绘制墙壁边界到指定容器 */
+export function createWalls(layer: Container): void {
+  const g = new Graphics()
   // 上
-  k.add([k.rect(CANVAS_SIZE, 4), k.pos(0, 0), k.color(58, 58, 92), k.z(2)])
+  g.rect(0, 0, CANVAS_SIZE, 4).fill(0x3a3a5c)
   // 下
-  k.add([k.rect(CANVAS_SIZE, 4), k.pos(0, CANVAS_SIZE - 4), k.color(58, 58, 92), k.z(2)])
+  g.rect(0, CANVAS_SIZE - 4, CANVAS_SIZE, 4).fill(0x3a3a5c)
   // 左
-  k.add([k.rect(4, CANVAS_SIZE), k.pos(0, 0), k.color(58, 58, 92), k.z(2)])
+  g.rect(0, 0, 4, CANVAS_SIZE).fill(0x3a3a5c)
   // 右
-  k.add([k.rect(4, CANVAS_SIZE), k.pos(CANVAS_SIZE - 4, 0), k.color(58, 58, 92), k.z(2)])
+  g.rect(CANVAS_SIZE - 4, 0, 4, CANVAS_SIZE).fill(0x3a3a5c)
+  layer.addChild(g)
 }

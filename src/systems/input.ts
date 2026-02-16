@@ -1,13 +1,13 @@
 /**
  * src/systems/input.ts — 输入系统（键盘/触屏/虚拟方向键）
- * 对应设计文档: design/L1-TASK-009-引擎重构架构设计.md 第七节 7.5
- * UI规格: design/ui/L1-TASK-010-引擎重构视觉规格.md 第九节
- * 从 js/input.js 迁移
+ * 对应设计文档: design/L1-TASK-020-PixiJS迁移架构设计.md 第九节 9.5、第十节 10.6
+ *
+ * 键盘部分从 Kaplay onKeyPress 改为原生 DOM keydown 事件。
+ * 触屏滑动和虚拟方向键代码保留（已是原生 DOM 事件）。
  */
 
 import { Direction } from '../types'
-import { SWIPE_THRESHOLD, MOBILE_BREAKPOINT } from '../constants'
-import k from '../engine'
+import { SWIPE_THRESHOLD } from '../constants'
 
 interface InputCallbacks {
   onDirection: (dir: Direction) => void
@@ -17,49 +17,35 @@ interface InputCallbacks {
 
 let callbacks: InputCallbacks | null = null
 
-/** 键盘按键到方向的映射 */
-const KEY_DIR_MAP: Record<string, Direction> = {
-  up: Direction.UP,
-  down: Direction.DOWN,
-  left: Direction.LEFT,
-  right: Direction.RIGHT,
-  w: Direction.UP,
-  s: Direction.DOWN,
-  a: Direction.LEFT,
-  d: Direction.RIGHT,
+/** 键盘按键到方向/动作的映射 */
+const KEY_MAP: Record<string, Direction> = {
+  ArrowUp: Direction.UP, ArrowDown: Direction.DOWN,
+  ArrowLeft: Direction.LEFT, ArrowRight: Direction.RIGHT,
+  w: Direction.UP, s: Direction.DOWN,
+  a: Direction.LEFT, d: Direction.RIGHT,
+  W: Direction.UP, S: Direction.DOWN,
+  A: Direction.LEFT, D: Direction.RIGHT,
 }
 
-/** 初始化输入系统 */
+function handleKeyDown(e: KeyboardEvent): void {
+  if (!callbacks) return
+  const dir = KEY_MAP[e.key]
+  if (dir) { callbacks.onDirection(dir); return }
+  if (e.key === ' ') { callbacks.onAction(); return }
+  if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { callbacks.onTogglePause() }
+}
+
+/** 初始化输入系统（注册 DOM 事件） */
 export function initInput(cbs: InputCallbacks): void {
   callbacks = cbs
-
-  // Kaplay 键盘事件
-  for (const [key, dir] of Object.entries(KEY_DIR_MAP)) {
-    k.onKeyPress(key as never, () => {
-      callbacks?.onDirection(dir)
-    })
-  }
-
-  k.onKeyPress('space' as never, () => {
-    callbacks?.onAction()
-  })
-
-  k.onKeyPress('escape' as never, () => {
-    callbacks?.onTogglePause()
-  })
-
-  k.onKeyPress('p' as never, () => {
-    callbacks?.onTogglePause()
-  })
-
-  // 触屏滑动
+  document.addEventListener('keydown', handleKeyDown)
   initTouchSwipe()
-  // 虚拟方向键
   initVirtualDpad()
 }
 
-/** 清理事件监听 */
+/** 清理所有事件监听 */
 export function destroyInput(): void {
+  document.removeEventListener('keydown', handleKeyDown)
   callbacks = null
 }
 

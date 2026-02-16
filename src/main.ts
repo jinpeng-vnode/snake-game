@@ -1,14 +1,28 @@
 /**
  * src/main.ts — 入口文件
- * 对应设计文档: design/L1-TASK-009-引擎重构架构设计.md 第七节 7.11
+ * 对应设计文档: design/L1-TASK-020-PixiJS迁移架构设计.md 第六节、第十节 10.2
  *
- * 1. 初始化 Kaplay 引擎（通过 import engine.ts）
- * 2. 注册游戏场景
- * 3. 启动场景
+ * 异步初始化 PixiJS Application，启动游戏。
  */
 
-import k from './engine'
-import { registerGameScene } from './scenes/game'
+import { initEngine } from './engine'
+import { CANVAS_SIZE } from './constants'
+import { startGame } from './scenes/game'
 
-registerGameScene()
-k.go('game')
+async function main(): Promise<void> {
+  const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement
+  if (!canvas) {
+    console.error('找不到 gameCanvas 元素')
+    return
+  }
+  try {
+    const app = await initEngine(canvas, CANVAS_SIZE, CANVAS_SIZE)
+    startGame(app)
+  } catch (e) {
+    console.error('PixiJS 初始化失败:', e)
+    // 降级提示
+    document.body.innerHTML = '<p style="color:#fff;text-align:center;margin-top:40vh">您的浏览器不支持 WebGL，无法运行游戏。</p>'
+  }
+}
+
+main()
