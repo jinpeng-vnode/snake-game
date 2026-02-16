@@ -37,12 +37,17 @@ const SoundManager = {
      * @returns {void}
      */
     ensureContext() {
-        if (this.ctx) return;
-        try {
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        } catch (_e) {
-            // AudioContext 不可用，静默降级
-            this.ctx = null;
+        if (!this.ctx) {
+            try {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (_e) {
+                this.ctx = null;
+                return;
+            }
+        }
+        // 浏览器策略：AudioContext 可能处于 suspended 状态，需在用户交互中 resume
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
         }
     },
 
