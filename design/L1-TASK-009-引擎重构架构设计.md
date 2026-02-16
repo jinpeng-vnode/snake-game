@@ -2,532 +2,668 @@
 
 ## 一、需求摘要
 
-根据 Issue #44，现有贪吃蛇项目 11 个 JS 模块共 1664 行代码，全部使用原生 Canvas API。需选定 Web 游戏引擎替代手写底层，降低代码复杂度，100% 保留现有功能，部署方式不变（GitHub Pages 静态站点）。
+根据 Issue #44（L1 TASK-009）和 PRD（docs/产品/L1-TASK-008-引擎重构-PRD.md），需要为贪吃蛇项目选定 Web 游戏引擎，替代当前手写的 Canvas 渲染、输入处理、粒子系统等底层模块。现有项目 11 个 JS 模块共 1664 行代码，全部使用原生 Canvas API。重构目标是降低代码复杂度，100% 保留现有功能，部署方式不变（GitHub Pages 静态站点）。
 
 ## 二、引擎选型对比
 
-| 维度 | Phaser 3 | PixiJS 8 | Kaplay (原 Kaboom.js) |
-|------|----------|----------|----------------------|
-| 定位 | 完整游戏框架 | 2D 渲染引擎 | 轻量游戏库 |
-| 包体积 (min+gzip) | ~300KB | ~200KB | ~80KB |
-| 场景管理 | ✅ 内置 | ❌ 无 | ✅ 内置 |
-| 输入系统 | ✅ 键盘/触屏/手柄 | ❌ 仅基础事件 | ✅ 键盘/触屏/手柄 |
-| 粒子系统 | ✅ 内置 | ✅ 插件 | ✅ 内置 |
-| 音频系统 | ✅ 内置 | ❌ 无 | ✅ 内置 |
-| 游戏循环 | ✅ 内置 | ✅ Ticker | ✅ 内置 |
-| API 简洁度 | 中等（配置多） | 低（只管渲染） | 高（链式调用，极简） |
-| TypeScript 支持 | ✅ | ✅ | ✅ |
-| GitHub Pages 兼容 | ✅ | ✅ | ✅ |
-| 社区活跃度 | 高（47k⭐） | 高（44k⭐） | 中（4k⭐） |
-| 学习成本 | 高 | 中 | 低 |
+### 2.1 候选引擎
 
-**选择 Kaplay，理由：**
+| 维度 | Phaser 3 | PixiJS v8 | Kaplay |
+|------|----------|-----------|--------|
+| GitHub Stars | 39k | 46.4k | 1.5k |
+| 贡献者 | 573 | ~500 | 94 |
+| 最新版本 | v3.90.0 (2025-05) | v8.x (持续更新) | 4000.0.0-alpha.26 |
+| 包体积(min) | ~1MB（完整）/ <150KB（Compressor 裁剪后 min+gz） | ~450KB min | ~300KB min（估算） |
+| 定位 | 完整 2D 游戏框架 | 2D 渲染引擎 | 轻量游戏库 |
+| 场景管理 | ✅ 内置 Scene 系统 | ❌ 需自行实现 | ✅ 内置 Scene |
+| 输入系统 | ✅ 键盘/鼠标/触屏/手柄 | ❌ 需自行实现或用插件 | ✅ 内置 |
+| 粒子系统 | ✅ 内置 ParticleEmitter | ❌ 需 @pixi/particle-emitter | ✅ 内置 |
+| 音频系统 | ✅ 内置 Web Audio | ❌ 需 @pixi/sound | ✅ 内置 |
+| 物理引擎 | ✅ Arcade/Matter.js | ❌ 无 | ✅ 内置 Arcade |
+| TypeScript | ✅ 完整类型定义 | ✅ 原生 TS | ✅ 原生 TS |
+| 文档质量 | ⭐⭐⭐⭐⭐ 极其丰富 | ⭐⭐⭐⭐ 良好 | ⭐⭐⭐ 一般 |
+| 社区活跃度 | ⭐⭐⭐⭐⭐ 10年+，商业维护 | ⭐⭐⭐⭐⭐ 活跃 | ⭐⭐ 较新，从 Kaboom.js fork |
+| GitHub Pages 兼容 | ✅ CDN 引入或 Vite 构建 | ✅ 同上 | ✅ 同上 |
+| 学习曲线 | 中等（API 丰富但有体系） | 较陡（需自建游戏框架） | 低（API 简洁） |
 
-1. **复杂度最低**（核心目标）：Kaplay 的 API 设计极简，一个 `add()` 创建对象、`onKeyPress()` 处理输入、`scene()` 管理场景，代码量预计减少 40-50%
-2. **功能覆盖完整**：内置场景管理、输入系统、粒子系统、游戏循环，贪吃蛇需要的能力全部覆盖
-3. **包体积最小**：~80KB gzip，对 GitHub Pages 加载速度影响最小
-4. **Phaser 过重**：贪吃蛇不需要物理引擎、Tilemap、Tween 等重量级功能，引入 Phaser 是杀鸡用牛刀
-5. **PixiJS 不够**：只是渲染引擎，输入/场景/粒子都要自己写，达不到降低复杂度的目标
+### 2.2 方案对比
 
-> 音效系统：PRD 要求保留 Web Audio API 合成音效（不引入音频文件），因此音效模块保留自定义实现，不使用 Kaplay 音频系统。
+| 方案 | 描述 | 优点 | 缺点 |
+|------|------|------|------|
+| A: Phaser 3 | 使用 Phaser 完整游戏框架 | 内置场景/输入/粒子/音频，开箱即用；文档和社区极其丰富；10年商业维护稳定可靠；Compressor 可裁剪包体积 | 完整包体积较大（可通过 Compressor 解决）；需引入 Vite 构建流程 |
+| B: PixiJS v8 | 使用 PixiJS 渲染引擎 + 自建游戏逻辑 | 渲染性能最强；包体积较小；灵活度高 | 无内置游戏框架，输入/粒子/音频/场景需自行实现或引入多个插件，等于重新造轮子，违背"降低复杂度"目标 |
+| C: Kaplay | 使用 Kaplay 轻量游戏库 | API 极简，上手快；包体积小 | 社区小（1.5k stars）；最新版仍为 alpha；文档不够完善；长期维护风险高 |
+
+**选择方案 A（Phaser 3），理由：**
+
+1. **核心目标匹配**：重构的核心目标是"降低复杂度"。Phaser 内置场景管理、输入系统、粒子系统、音频系统，可直接替代现有手写的 renderer.js（395行）、input.js（151行）、particle.js（80行）、sound.js（174行），总计 800 行底层代码由引擎接管。
+2. **功能覆盖完整**：现有 11 个模块的所有功能（键盘/触屏/虚拟方向键输入、5种食物渲染、粒子特效、Web Audio 音效、暂停遮罩、响应式适配）均有 Phaser 原生 API 对应，无需额外插件。
+3. **稳定性和生态**：39k stars，573 贡献者，10年+商业维护，文档和示例极其丰富，遇到问题容易找到解决方案。
+4. **包体积可控**：通过 Phaser Compressor 可裁剪至 <150KB (min+gz)，或通过 Vite tree-shaking 优化。
+5. **部署兼容**：支持 Vite 构建输出纯静态文件，完全兼容 GitHub Pages。
+
 
 ## 三、构建与部署方案
 
-### 构建工具
+### 3.1 引入 Vite 构建
 
-引入 Vite + TypeScript：
-- 现有项目为纯 ES Module（`<script type="module">`），无构建工具
-- 引入 Kaplay 需要 npm 包管理，Vite 是最轻量的选择
-- `npm run build` 输出纯静态文件到 `dist/`，与 GitHub Pages 完全兼容
+现有项目使用原生 ES Module（`<script type="module">`），无构建工具。引入 Phaser 后需要 Vite 作为构建工具：
 
-### 部署流程
+- **开发阶段**：`vite dev` 提供 HMR 热更新
+- **构建阶段**：`vite build` 输出到 `dist/` 目录，纯静态文件
+- **部署阶段**：GitHub Actions 部署 `dist/` 目录到 GitHub Pages
 
-GitHub Actions 修改为：
+### 3.2 GitHub Actions 更新
+
 ```yaml
-# 新增 build 步骤
-- run: npm ci
-- run: npm run build
-# 部署 dist/ 目录
-- uses: actions/upload-pages-artifact@v3
-  with:
-    path: dist
+# .github/workflows/deploy-pages.yml 需修改
+# 构建步骤：npm ci → npm run build
+# 上传路径：从 . 改为 dist/
 ```
 
-### 关键配置
+### 3.3 CDN 引入方式（备选）
 
-```typescript
-// vite.config.ts
-import { defineConfig } from 'vite'
-
-export default defineConfig({
-  base: './',  // GitHub Pages 相对路径
-  build: {
-    outDir: 'dist',
-    assetsInlineLimit: 0,
-  },
-})
+如果不想引入构建工具，可通过 CDN 直接引入：
+```html
+<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
 ```
+但此方式无法 tree-shaking，包体积较大（~1MB），且无法使用 ES Module import。**不推荐。**
 
-## 四、文件结构
+**最终决定：使用 Vite 构建。** 理由：支持 tree-shaking 减小包体积、支持 TypeScript、支持 HMR 开发体验好、输出纯静态文件兼容 GitHub Pages。
+
+## 四、新项目目录结构
 
 ```
 snake-game/
 ├── index.html                    # Vite 入口 HTML
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── src/
-│   ├── main.ts                   # 入口：初始化 Kaplay，注册场景，启动
-│   ├── constants.ts              # 常量与枚举（从 js/constants.js 迁移）
-│   ├── types.ts                  # 全局类型定义
-│   ├── scenes/
-│   │   └── game.ts               # 游戏主场景（整合状态机 + 游戏循环）
-│   ├── objects/
-│   │   ├── snake.ts              # 蛇：数据模型 + Kaplay 渲染对象
-│   │   ├── food.ts               # 食物：生成逻辑 + Kaplay 渲染对象
-│   │   └── wall.ts               # 墙壁：边界渲染
-│   └── systems/
-│       ├── input.ts              # 输入：键盘/触屏/虚拟方向键
-│       ├── effect.ts             # 特效管理：加速/减速/双倍/缩短
-│       ├── score.ts              # 分数管理 + localStorage 持久化
-│       ├── sound.ts              # 音效：Web Audio API 合成（保留）
-│       └── particle.ts           # 粒子：Kaplay 粒子系统封装
+├── package.json                  # 依赖管理
+├── vite.config.ts                # Vite 配置
+├── tsconfig.json                 # TypeScript 配置
+├── src/                          # 源码目录
+│   ├── main.ts                   # 入口：创建 Phaser.Game 实例
+│   ├── config.ts                 # Phaser 游戏配置（画布尺寸、场景列表等）
+│   ├── constants.ts              # 游戏常量（从 js/constants.js 迁移）
+│   ├── scenes/                   # Phaser 场景
+│   │   ├── GameScene.ts          # 游戏主场景（playing 状态的核心逻辑）
+│   │   └── UIScene.ts            # UI 覆盖层场景（分数、效果指示器、遮罩）
+│   ├── objects/                  # 游戏对象
+│   │   ├── Snake.ts              # 蛇对象（数据模型 + Phaser 渲染）
+│   │   ├── Food.ts               # 食物对象（生成逻辑 + Phaser 渲染）
+│   │   └── Particle.ts           # 粒子特效（封装 Phaser ParticleEmitter）
+│   ├── managers/                 # 管理器
+│   │   ├── InputManager.ts       # 输入管理（封装 Phaser 输入 + 虚拟方向键）
+│   │   ├── SoundManager.ts       # 音效管理（封装 Phaser/Web Audio）
+│   │   ├── EffectManager.ts      # 特效管理（加速/减速/双倍，纯逻辑）
+│   │   └── ScoreManager.ts       # 分数管理（纯逻辑 + localStorage）
+│   └── types.ts                  # 公共类型定义
+├── public/                       # 静态资源（直接复制到 dist/）
+├── dist/                         # 构建输出（git ignore）
 ├── design/                       # 设计文档（保留）
-├── docs/                         # 产品/测试文档（保留）
-└── .github/workflows/deploy-pages.yml  # 更新部署流程
+├── docs/                         # 项目文档（保留）
+└── .github/workflows/            # CI/CD
+    └── deploy-pages.yml          # GitHub Pages 部署（需更新）
 ```
 
-## 五、模块职责与现有代码映射
 
-| 新模块 | 对应旧文件 | 迁移方式 | 预估行数 |
-|--------|-----------|----------|---------|
-| `src/constants.ts` | `js/constants.js` (78行) | 直接迁移，加 TS 类型 | ~70 |
-| `src/types.ts` | 无 | 新建，集中类型定义 | ~30 |
-| `src/main.ts` | `js/main.js` (12行) | 重写为 Kaplay 初始化 | ~30 |
-| `src/scenes/game.ts` | `js/game.js` (390行) | 用 Kaplay scene + onUpdate 替代手写循环 | ~150 |
-| `src/objects/snake.ts` | `js/snake.js` (114行) | 保留数据逻辑，渲染交给 Kaplay | ~80 |
-| `src/objects/food.ts` | `js/food.js` (104行) | 保留生成逻辑，渲染交给 Kaplay | ~70 |
-| `src/objects/wall.ts` | `js/renderer.js` 墙壁部分 | 用 Kaplay rect 绘制 | ~20 |
-| `src/systems/input.ts` | `js/input.js` (151行) | 用 Kaplay onKeyPress 替代，保留触屏/虚拟键 | ~60 |
-| `src/systems/effect.ts` | `js/effect.js` (86行) | 保留逻辑层，加 TS 类型 | ~60 |
-| `src/systems/score.ts` | `js/score.js` (80行) | 保留逻辑层，加 TS 类型 | ~50 |
-| `src/systems/sound.ts` | `js/sound.js` (174行) | 保留 Web Audio API 实现 | ~120 |
-| `src/systems/particle.ts` | `js/particle.js` (80行) | 用 Kaplay 粒子系统替代 | ~30 |
-| `js/renderer.js` (395行) | — | **删除**，渲染全部由 Kaplay 接管 | 0 |
-| **合计** | **1664行** | | **~770** |
+## 五、模块划分与职责
 
-> 预计代码量减少约 50%，主要来自删除 renderer.js（395行）和简化 game.js（390→150行）。
+### 5.1 现有模块到新模块的映射
+
+| 现有文件 | 行数 | 新模块 | 迁移策略 |
+|----------|------|--------|----------|
+| `js/main.js` | 12 | `src/main.ts` | 重写为 Phaser.Game 初始化 |
+| `js/constants.js` | 78 | `src/constants.ts` | 直接迁移，改为 TS，数值不变 |
+| `js/game.js` | 390 | `src/scenes/GameScene.ts` | 游戏循环由 Phaser Scene.update() 接管，状态管理保留 |
+| `js/renderer.js` | 395 | `src/scenes/GameScene.ts` + `src/scenes/UIScene.ts` | **完全废弃**，渲染由 Phaser Graphics/Text 对象替代 |
+| `js/snake.js` | 114 | `src/objects/Snake.ts` | 数据逻辑保留，渲染改用 Phaser Graphics |
+| `js/food.js` | 104 | `src/objects/Food.ts` | 生成逻辑保留，渲染改用 Phaser Graphics |
+| `js/input.js` | 151 | `src/managers/InputManager.ts` | **完全废弃**，改用 Phaser Input 系统 |
+| `js/particle.js` | 80 | `src/objects/Particle.ts` | **完全废弃**，改用 Phaser ParticleEmitter |
+| `js/sound.js` | 174 | `src/managers/SoundManager.ts` | Web Audio 合成逻辑保留（PRD 要求不引入音频文件），Phaser 管理生命周期 |
+| `js/effect.js` | 86 | `src/managers/EffectManager.ts` | 纯逻辑，直接迁移为 TS |
+| `js/score.js` | 80 | `src/managers/ScoreManager.ts` | 纯逻辑，直接迁移为 TS |
+
+### 5.2 各模块详细职责
+
+#### `src/main.ts` — 入口
+- 创建 `Phaser.Game` 实例，传入配置
+- 处理页面 resize 事件，调用 `game.scale.resize()`
+
+#### `src/config.ts` — Phaser 游戏配置
+- 导出 `Phaser.Types.Core.GameConfig` 对象
+- 配置项：Canvas 渲染模式、画布尺寸、场景列表、缩放模式（Scale.FIT）、背景色
+
+#### `src/constants.ts` — 游戏常量
+- 从 `js/constants.js` 1:1 迁移，改为 TypeScript const enum / const
+- 所有数值保持不变
+
+#### `src/scenes/GameScene.ts` — 游戏主场景
+- 继承 `Phaser.Scene`
+- `create()`：初始化蛇、食物、输入、音效、粒子
+- `update(time, delta)`：替代原 `Game.tick()`，处理游戏主循环
+- 管理游戏状态（ready/playing/paused/gameOver/win）
+- 协调所有子模块
+
+#### `src/scenes/UIScene.ts` — UI 覆盖层场景
+- 继承 `Phaser.Scene`，以覆盖层方式运行（`this.scene.launch('UIScene')`）
+- 绘制：效果状态指示器、暂停遮罩、游戏结束/通关遮罩、开始界面
+- 监听 GameScene 事件更新 UI
+
+#### `src/objects/Snake.ts` — 蛇对象
+- 数据模型：segments 数组、direction、移动/碰撞逻辑（从 js/snake.js 迁移）
+- 渲染：使用 Phaser.GameObjects.Graphics 绘制蛇头（圆角矩形+眼睛）、蛇身（渐变色）、蛇尾（略小）
+
+#### `src/objects/Food.ts` — 食物对象
+- 生成逻辑：概率随机、限时倒计时、闪烁（从 js/food.js 迁移）
+- 渲染：使用 Phaser.GameObjects.Graphics 绘制 5 种形状（circle/diamond/triangle/star/square）
+
+#### `src/objects/Particle.ts` — 粒子特效
+- 封装 Phaser.GameObjects.Particles.ParticleEmitter
+- 提供 `spawn(gridX, gridY, color)` 接口
+- 吃食物和游戏结束时触发
+
+#### `src/managers/InputManager.ts` — 输入管理
+- 封装 Phaser Input：`this.scene.input.keyboard`（键盘）、`this.scene.input.on('pointerdown/pointerup')`（触屏滑动）
+- 管理虚拟方向键（DOM 按钮，通过事件桥接到 Phaser）
+- 提供 `consumeDirection()` 接口，与现有逻辑一致
+
+#### `src/managers/SoundManager.ts` — 音效管理
+- 保留 Web Audio API 合成音效逻辑（PRD 要求不引入音频文件）
+- 管理 AudioContext 生命周期
+- 静音状态持久化到 localStorage
+
+#### `src/managers/EffectManager.ts` — 特效管理
+- 纯逻辑，从 js/effect.js 直接迁移为 TS
+- 管理加速/减速/双倍得分效果的添加、更新、过期
+
+#### `src/managers/ScoreManager.ts` — 分数管理
+- 纯逻辑，从 js/score.js 直接迁移为 TS
+- 管理当前分数、最高分、localStorage 持久化
+
+#### `src/types.ts` — 公共类型定义
+- Direction、GameState、FoodType 等类型定义
+
 
 ## 六、类型定义
 
 ```typescript
 // src/types.ts
 
-/** 方向枚举 */
-export enum Direction {
-  UP = 'up',
-  DOWN = 'down',
-  LEFT = 'left',
-  RIGHT = 'right',
+/** 方向枚举，值为坐标增量 */
+export const Direction = {
+    UP:    { dx: 0,  dy: -1 },
+    DOWN:  { dx: 0,  dy: 1  },
+    LEFT:  { dx: -1, dy: 0  },
+    RIGHT: { dx: 1,  dy: 0  },
+} as const;
+
+export type DirectionValue = typeof Direction[keyof typeof Direction];
+
+/** 游戏状态枚举 */
+export enum GameState {
+    READY     = 'ready',
+    PLAYING   = 'playing',
+    PAUSED    = 'paused',
+    GAME_OVER = 'gameOver',
+    WIN       = 'win',
 }
 
-/** 方向到坐标增量的映射 */
-export const DIR_VECTORS: Record<Direction, GridPos> = {
-  [Direction.UP]:    { x: 0,  y: -1 },
-  [Direction.DOWN]:  { x: 0,  y: 1  },
-  [Direction.LEFT]:  { x: -1, y: 0  },
-  [Direction.RIGHT]: { x: 1,  y: 0  },
-}
-
-/** 反方向映射（用于忽略反向输入） */
-export const OPPOSITE: Record<Direction, Direction> = {
-  [Direction.UP]:    Direction.DOWN,
-  [Direction.DOWN]:  Direction.UP,
-  [Direction.LEFT]:  Direction.RIGHT,
-  [Direction.RIGHT]: Direction.LEFT,
+/** 食物类型定义 */
+export interface FoodTypeConfig {
+    name: string;
+    color: string;
+    shape: 'circle' | 'diamond' | 'triangle' | 'star' | 'square';
+    score: number;
+    probability: number;
+    timeout: number | null;
+    effect: 'speed' | 'slow' | 'double' | null;
+    effectDuration: number | null;
 }
 
 /** 网格坐标 */
-export interface GridPos {
-  x: number
-  y: number
+export interface GridPoint {
+    x: number;
+    y: number;
 }
 
-/** 游戏状态 */
-export enum GameState {
-  READY = 'ready',
-  PLAYING = 'playing',
-  PAUSED = 'paused',
-  GAME_OVER = 'gameOver',
-  WIN = 'win',
-}
-
-/** 食物类型标识 */
-export enum FoodKind {
-  NORMAL = 'normal',
-  SPEED = 'speed',
-  SLOW = 'slow',
-  DOUBLE = 'double',
-  SHRINK = 'shrink',
-}
-
-/** 食物类型配置 */
-export interface FoodConfig {
-  kind: FoodKind
-  name: string
-  color: string
-  shape: 'circle' | 'diamond' | 'triangle' | 'star' | 'square'
-  score: number
-  probability: number
-  timeout: number | null       // 限时毫秒，null 表示不限时
-  effect: EffectType | null
-  effectDuration: number | null // 效果持续毫秒
-}
-
-/** 特效类型 */
-export enum EffectType {
-  SPEED = 'speed',   // tick ×0.7
-  SLOW = 'slow',     // tick ×1.3
-  DOUBLE = 'double', // 得分 ×2
-}
-
-/** 活跃特效 */
+/** 活跃效果 */
 export interface ActiveEffect {
-  type: EffectType
-  remaining: number  // 剩余毫秒
-  duration: number   // 总持续毫秒
+    type: 'speed' | 'slow' | 'double';
+    remaining: number;
 }
+```
+
+```typescript
+// src/constants.ts — 所有数值与现有 js/constants.js 完全一致
+
+import type { FoodTypeConfig } from './types';
+
+export const GRID_COUNT = 20;
+export const CELL_SIZE = 30;
+export const CANVAS_SIZE = GRID_COUNT * CELL_SIZE; // 600
+export const TICK_INTERVAL = 180;
+export const SCORE_PER_FOOD = 10;
+export const HIGH_SCORE_KEY = 'snakeHighScore';
+export const MUTE_KEY = 'snakeMuted';
+export const SWIPE_THRESHOLD = 30;
+export const MOBILE_BREAKPOINT = 768;
+
+export const FoodType: Record<string, FoodTypeConfig> = {
+    NORMAL: { name: '普通', color: '#F44336', shape: 'circle',   score: 10, probability: 1.0,  timeout: null, effect: null,     effectDuration: null },
+    SPEED:  { name: '加速', color: '#FF9800', shape: 'diamond',  score: 15, probability: 0.15, timeout: 8000, effect: 'speed',  effectDuration: 5000 },
+    SLOW:   { name: '减速', color: '#2196F3', shape: 'triangle', score: 15, probability: 0.15, timeout: 8000, effect: 'slow',   effectDuration: 5000 },
+    DOUBLE: { name: '双倍', color: '#FFD700', shape: 'star',     score: 20, probability: 0.10, timeout: 8000, effect: 'double', effectDuration: 8000 },
+    SHRINK: { name: '缩短', color: '#9C27B0', shape: 'square',   score: 5,  probability: 0.10, timeout: 6000, effect: null,     effectDuration: null },
+};
 ```
 
 ## 七、对外接口（模块间接口签名）
 
-### 7.1 constants.ts — 常量导出
+### 7.1 Snake
 
 ```typescript
-export const GRID_COUNT: number           // 20
-export const CELL_SIZE: number            // 30
-export const CANVAS_SIZE: number          // 600
-export const TICK_INTERVAL: number        // 180
-export const SCORE_PER_FOOD: number       // 10
-export const HIGH_SCORE_KEY: string       // 'snakeHighScore'
-export const MUTE_KEY: string             // 'snakeMuted'
-export const SWIPE_THRESHOLD: number      // 30
-export const MOBILE_BREAKPOINT: number    // 768
-export const FOOD_CONFIGS: FoodConfig[]   // 5 种食物配置数组
+// src/objects/Snake.ts
+export default class Snake {
+    segments: GridPoint[];
+    direction: DirectionValue;
+
+    constructor(scene: Phaser.Scene);
+
+    /** 初始化蛇到默认位置（中央，长度3，向右） */
+    init(): void;
+
+    /** 获取蛇头位置 */
+    getHead(): GridPoint;
+
+    /** 移动蛇，grow=true 时不移除尾部 */
+    move(grow: boolean): void;
+
+    /** 设置方向（禁止掉头），返回是否成功 */
+    setDirection(newDir: DirectionValue): boolean;
+
+    /** 检测蛇头是否与自身碰撞 */
+    checkSelfCollision(): boolean;
+
+    /** 检测指定坐标是否在蛇身上 */
+    occupies(point: GridPoint): boolean;
+
+    /** 获取蛇身长度 */
+    getLength(): number;
+
+    /** 缩短蛇身（最短保持1节） */
+    shrink(count: number): void;
+
+    /** 使用 Phaser Graphics 重绘蛇 */
+    draw(): void;
+
+    /** 销毁 Phaser 对象 */
+    destroy(): void;
+}
 ```
 
-### 7.2 objects/snake.ts
+### 7.2 Food
 
 ```typescript
-/** 蛇数据管理 + Kaplay 渲染 */
+// src/objects/Food.ts
+export default class Food {
+    position: GridPoint | null;
+    type: FoodTypeConfig | null;
+    timeRemaining: number | null;
 
-/** 初始化蛇（创建 Kaplay 对象，初始 3 格，方向向右） */
-export function createSnake(): void
+    constructor(scene: Phaser.Scene);
 
-/** 设置方向（自动忽略反方向） */
-export function setDirection(dir: Direction): void
+    /** 按概率随机生成食物 */
+    spawn(isOccupied: (point: GridPoint) => boolean): void;
 
-/** 获取当前方向 */
-export function getDirection(): Direction
+    /** 生成指定类型食物 */
+    spawnType(isOccupied: (point: GridPoint) => boolean, foodType: FoodTypeConfig): void;
 
-/** 获取蛇头网格坐标 */
-export function getHead(): GridPos
+    /** 更新限时倒计时，返回是否超时 */
+    updateTimer(deltaMs: number): boolean;
 
-/** 获取所有蛇身段网格坐标 */
-export function getSegments(): GridPos[]
+    /** 判断是否处于闪烁隐藏帧 */
+    isBlinking(): boolean;
 
-/** 移动蛇（grow=true 时蛇身+1） */
-export function move(grow: boolean): void
+    /** 使用 Phaser Graphics 重绘食物 */
+    draw(): void;
 
-/** 缩短蛇身（移除尾部 n 格，最少保留 1 格） */
-export function shrink(n: number): void
-
-/** 检测自身碰撞 */
-export function checkSelfCollision(): boolean
-
-/** 检测指定坐标是否被蛇占据 */
-export function occupies(pos: GridPos): boolean
-
-/** 获取蛇身长度 */
-export function getLength(): number
-
-/** 销毁所有 Kaplay 对象 */
-export function destroy(): void
+    /** 销毁 Phaser 对象 */
+    destroy(): void;
+}
 ```
 
-### 7.3 objects/food.ts
+### 7.3 Particle
 
 ```typescript
-/** 食物管理 + Kaplay 渲染 */
+// src/objects/Particle.ts
+export default class ParticleEffect {
+    constructor(scene: Phaser.Scene);
 
-/** 按概率随机生成食物（避开蛇身） */
-export function spawn(isOccupied: (pos: GridPos) => boolean): void
+    /** 在指定网格位置生成粒子特效 */
+    spawn(gridX: number, gridY: number, color?: string): void;
 
-/** 生成指定类型食物 */
-export function spawnKind(isOccupied: (pos: GridPos) => boolean, kind: FoodKind): void
+    /** 清空所有粒子 */
+    clear(): void;
 
-/** 获取当前食物位置（无食物返回 null） */
-export function getPosition(): GridPos | null
-
-/** 获取当前食物配置 */
-export function getConfig(): FoodConfig | null
-
-/** 更新限时倒计时，返回是否已过期 */
-export function updateTimer(deltaMs: number): boolean
-
-/** 当前食物是否在闪烁（剩余 ≤3 秒） */
-export function isBlinking(): boolean
-
-/** 销毁当前食物 Kaplay 对象 */
-export function destroy(): void
+    /** 销毁 Phaser 对象 */
+    destroy(): void;
+}
 ```
 
-### 7.4 objects/wall.ts
+### 7.4 InputManager
 
 ```typescript
-/** 绘制墙壁边界 */
-export function createWalls(): void
+// src/managers/InputManager.ts
+export default class InputManager {
+    constructor(scene: Phaser.Scene);
+
+    /** 初始化键盘、触屏、虚拟方向键输入 */
+    init(onAction: () => void, onPause: () => void): void;
+
+    /** 消费并返回待处理的方向输入 */
+    consumeDirection(): DirectionValue | null;
+
+    /** 销毁事件监听 */
+    destroy(): void;
+}
 ```
 
-### 7.5 systems/input.ts
+### 7.5 SoundManager
 
 ```typescript
-/** 输入系统：注册 Kaplay 键盘事件 + 触屏 + 虚拟方向键 */
+// src/managers/SoundManager.ts
+export default class SoundManager {
+    constructor();
 
-/** 初始化输入系统（注册所有事件监听） */
-export function initInput(callbacks: {
-  onDirection: (dir: Direction) => void
-  onAction: () => void       // 空格/点击
-  onTogglePause: () => void  // ESC/P
-}): void
+    /** 初始化：读取 localStorage 静音状态 */
+    init(): void;
 
-/** 清理事件监听 */
-export function destroyInput(): void
+    /** 确保 AudioContext 已创建 */
+    ensureContext(): void;
+
+    /** 播放吃食物音效 */
+    playEat(): void;
+
+    /** 播放游戏结束音效 */
+    playGameOver(): void;
+
+    /** 开始背景音乐 */
+    startBgm(): void;
+
+    /** 停止背景音乐 */
+    stopBgm(): void;
+
+    /** 切换静音 */
+    toggleMute(): void;
+
+    /** 获取静音状态 */
+    isMuted(): boolean;
+}
 ```
 
-### 7.6 systems/effect.ts
+### 7.6 EffectManager
 
 ```typescript
-/** 特效管理 */
+// src/managers/EffectManager.ts
+export default class EffectManager {
+    /** 添加效果（同类型刷新持续时间） */
+    add(type: 'speed' | 'slow' | 'double', duration: number): void;
 
-/** 添加特效（同类型覆盖） */
-export function addEffect(type: EffectType, durationMs: number): void
+    /** 更新剩余时间，移除过期效果 */
+    update(deltaMs: number): void;
 
-/** 更新所有特效剩余时间，自动移除过期特效 */
-export function updateEffects(deltaMs: number): void
+    /** 获取 tick 间隔倍率 */
+    getSpeedMultiplier(): number;
 
-/** 获取速度倍率（加速 0.7 / 减速 1.3 / 无效果 1.0） */
-export function getSpeedMultiplier(): number
+    /** 获取得分倍率 */
+    getScoreMultiplier(): number;
 
-/** 获取得分倍率（双倍 2.0 / 无效果 1.0） */
-export function getScoreMultiplier(): number
+    /** 获取生效效果列表 */
+    getActiveEffects(): ActiveEffect[];
 
-/** 获取所有活跃特效列表 */
-export function getActiveEffects(): ActiveEffect[]
-
-/** 清空所有特效 */
-export function clearEffects(): void
+    /** 清空所有效果 */
+    clear(): void;
+}
 ```
 
-### 7.7 systems/score.ts
+### 7.7 ScoreManager
 
 ```typescript
-/** 分数管理 */
+// src/managers/ScoreManager.ts
+export default class ScoreManager {
+    current: number;
+    high: number;
 
-/** 初始化（从 localStorage 读取最高分） */
-export function initScore(): void
+    /** 初始化：从 localStorage 读取最高分 */
+    init(): void;
 
-/** 重置当前分数为 0 */
-export function resetScore(): void
+    /** 增加分数（支持倍率） */
+    add(baseScore: number, multiplier?: number): void;
 
-/** 加分（baseScore × multiplier） */
-export function addScore(baseScore: number, multiplier: number): void
-
-/** 获取当前分数 */
-export function getCurrentScore(): number
-
-/** 获取最高分 */
-export function getHighScore(): number
-
-/** 更新 DOM 显示 */
-export function updateDisplay(scoreEl: HTMLElement, highScoreEl: HTMLElement): void
+    /** 重置当前分数 */
+    reset(): void;
+}
 ```
 
-### 7.8 systems/sound.ts
+### 7.8 GameScene
 
 ```typescript
-/** 音效管理（Web Audio API 合成，不引入音频文件） */
+// src/scenes/GameScene.ts
+export default class GameScene extends Phaser.Scene {
+    /** Phaser 生命周期：创建游戏对象 */
+    create(): void;
 
-/** 初始化（读取 localStorage 静音状态） */
-export function initSound(): void
-
-/** 确保 AudioContext 已创建（用户交互时调用） */
-export function ensureContext(): void
-
-/** 播放吃食物音效 */
-export function playEat(): void
-
-/** 播放游戏结束音效 */
-export function playGameOver(): void
-
-/** 开始背景音乐 */
-export function startBgm(): void
-
-/** 停止背景音乐 */
-export function stopBgm(): void
-
-/** 切换静音 */
-export function toggleMute(): void
-
-/** 是否静音 */
-export function isMuted(): boolean
+    /** Phaser 生命周期：每帧更新（替代原 Game.tick） */
+    update(time: number, delta: number): void;
+}
 ```
 
-### 7.9 systems/particle.ts
+### 7.9 UIScene
 
 ```typescript
-/** 粒子特效（封装 Kaplay 粒子系统） */
+// src/scenes/UIScene.ts
+export default class UIScene extends Phaser.Scene {
+    /** 创建 UI 元素（效果指示器、遮罩文字等） */
+    create(): void;
 
-/** 在指定网格位置生成吃食物粒子 */
-export function spawnEatParticle(gridX: number, gridY: number, color: string): void
-
-/** 生成游戏结束粒子 */
-export function spawnGameOverParticle(): void
+    /** 每帧更新 UI 状态 */
+    update(time: number, delta: number): void;
+}
 ```
 
-### 7.10 scenes/game.ts
-
-```typescript
-/** 游戏主场景 — 注册到 Kaplay scene 系统 */
-
-/** 注册游戏场景（在 main.ts 中调用） */
-export function registerGameScene(): void
-```
-
-> 场景内部管理 GameState 状态机、tick 循环、模块协调。不对外暴露内部状态。
-
-### 7.11 main.ts
-
-```typescript
-/** 入口文件 */
-// 1. 调用 kaplay() 初始化引擎
-// 2. 调用 registerGameScene()
-// 3. 调用 go("game") 启动场景
-```
 
 ## 八、模块依赖
 
 ```
 main.ts
-  └── scenes/game.ts
-        ├── objects/snake.ts    ← constants.ts, types.ts
-        ├── objects/food.ts     ← constants.ts, types.ts
-        ├── objects/wall.ts     ← constants.ts
-        ├── systems/input.ts    ← types.ts
-        ├── systems/effect.ts   ← types.ts
-        ├── systems/score.ts    ← constants.ts
-        ├── systems/sound.ts    ← constants.ts
-        └── systems/particle.ts ← constants.ts
+  └── config.ts
+        └── GameScene
+              ├── Snake (objects)
+              ├── Food (objects)
+              ├── Particle (objects)
+              ├── InputManager (managers)
+              ├── SoundManager (managers)
+              ├── EffectManager (managers)
+              └── ScoreManager (managers)
+        └── UIScene
+              └── 监听 GameScene 事件
 ```
 
-- 所有模块依赖 `constants.ts` 和 `types.ts`（无循环依赖）
-- `scenes/game.ts` 是唯一的协调者，调用所有 objects 和 systems
-- objects 和 systems 之间互不依赖
+| 模块 | 依赖 | 被依赖 |
+|------|------|--------|
+| `constants.ts` | 无 | 所有模块 |
+| `types.ts` | 无 | 所有模块 |
+| `config.ts` | constants, GameScene, UIScene | main.ts |
+| `main.ts` | config | 无（入口） |
+| `GameScene` | Snake, Food, Particle, InputManager, SoundManager, EffectManager, ScoreManager, constants | UIScene（通过事件） |
+| `UIScene` | constants | 无 |
+| `Snake` | constants, types | GameScene |
+| `Food` | constants, types | GameScene |
+| `Particle` | constants | GameScene |
+| `InputManager` | constants, types | GameScene |
+| `SoundManager` | constants | GameScene |
+| `EffectManager` | types | GameScene |
+| `ScoreManager` | constants | GameScene |
+
+无循环依赖。
 
 ## 九、错误处理
 
 | 错误场景 | 处理方式 |
 |----------|----------|
-| Kaplay 初始化失败 | 控制台 error 日志，显示降级提示 |
-| AudioContext 创建失败 | 静默降级，禁用音效 |
-| localStorage 不可用 | catch 后使用内存变量，不持久化 |
-| 食物生成无空位（蛇占满网格） | 触发通关状态 |
-| 触屏事件不支持 | 仅注册键盘事件，虚拟方向键仍可用 |
+| AudioContext 创建失败 | 静默降级，不播放音效 |
+| localStorage 不可用 | 静默降级，不持久化分数/静音状态 |
+| Phaser 初始化失败 | 控制台输出错误，显示降级提示 |
+| 画布 resize 异常 | 使用 Phaser Scale Manager 自动处理 |
+| 触屏事件不支持 | Phaser Input 自动检测，不影响键盘操作 |
 
-## 十、模块分配表
+## 十、Phaser 场景架构详解
 
-| 模块 | 负责角色 | 负责目录 | 可读目录 | 禁止触碰 |
-|------|----------|---------|---------|----------|
-| 项目搭建 + 场景框架 | 前端开发A | `src/main.ts`, `src/scenes/`, `src/constants.ts`, `src/types.ts`, `vite.config.ts`, `package.json`, `tsconfig.json`, `index.html` | 全部 src/ | — |
-| 蛇 + 食物 + 墙壁 | 前端开发A | `src/objects/` | `src/constants.ts`, `src/types.ts` | `src/systems/` |
-| 输入 + 特效 + 分数 | 前端开发B | `src/systems/input.ts`, `src/systems/effect.ts`, `src/systems/score.ts` | `src/constants.ts`, `src/types.ts` | `src/objects/`, `src/scenes/` |
-| 音效 + 粒子 | 前端开发B | `src/systems/sound.ts`, `src/systems/particle.ts` | `src/constants.ts`, `src/types.ts` | `src/objects/`, `src/scenes/` |
-| GitHub Actions 部署 | 运维 | `.github/workflows/` | `vite.config.ts`, `package.json` | `src/` |
+### 10.1 双场景设计
 
-> 共享文件负责人：`src/constants.ts`、`src/types.ts` 由前端开发A 负责，前端开发B 只读。
+采用 GameScene + UIScene 双场景并行运行：
 
-## 十一、开发层级（L1/L2/L3）与迁移顺序
+- **GameScene**：负责游戏逻辑和游戏对象渲染（蛇、食物、墙壁、粒子、背景）
+- **UIScene**：以覆盖层运行，负责 UI 渲染（效果指示器、暂停/结束遮罩、开始界面文字）
 
-| 层级 | 任务 | 说明 | 依赖 |
-|------|------|------|------|
-| L1 | TASK-009: 引擎选型与架构设计（本文档） | 架构师产出 | 无 |
-| L2 | TASK-010: 项目搭建与基础框架 | Vite + Kaplay 初始化、constants.ts、types.ts、空场景框架、index.html 改造 | L1 |
-| L2 | TASK-011: GitHub Actions 部署更新 | 修改 deploy-pages.yml 支持 Vite 构建 | L1 |
-| L3 | TASK-012: 蛇模块迁移 | snake.ts — 数据模型 + Kaplay 渲染 | L2(TASK-010) |
-| L3 | TASK-013: 食物与墙壁模块迁移 | food.ts + wall.ts — 生成逻辑 + Kaplay 渲染 | L2(TASK-010) |
-| L3 | TASK-014: 输入系统迁移 | input.ts — Kaplay 键盘 + 触屏 + 虚拟方向键 | L2(TASK-010) |
-| L3 | TASK-015: 特效与分数系统迁移 | effect.ts + score.ts | L2(TASK-010) |
-| L3 | TASK-016: 音效与粒子系统迁移 | sound.ts + particle.ts | L2(TASK-010) |
-| L4 | TASK-017: 游戏场景集成 | game.ts — 整合所有模块，实现完整游戏循环 | L3(全部) |
-| L5 | TASK-018: 集成测试与视觉验收 | 功能 1:1 对比验证 | L4 |
+双场景的好处：
+1. UI 渲染与游戏逻辑解耦
+2. 暂停时可以只停 GameScene 的 update，UIScene 继续响应
+3. 遮罩层自然覆盖在游戏画面之上
 
-> L3 层的 TASK-012 ~ TASK-016 可并行开发，各模块按设计文档接口签名独立实现。
+### 10.2 游戏循环设计
 
-## 十二、Kaplay 核心 API 使用说明（开发者参考）
+现有项目使用 `setInterval(tick, 180ms)` 实现固定 tick。Phaser 的 `update(time, delta)` 是每帧调用（~60fps）。
+
+**方案：在 Phaser update 中累积 delta，达到 TICK_INTERVAL 时执行一次游戏逻辑 tick。**
 
 ```typescript
-import kaplay from 'kaplay'
+// GameScene.update 中的 tick 累积逻辑（伪代码）
+private tickAccumulator: number = 0;
 
-// 初始化
-const k = kaplay({
-  width: 600,
-  height: 600,
-  background: [15, 15, 35],  // #0f0f23
-  canvas: document.getElementById('gameCanvas') as HTMLCanvasElement,
-  global: false,  // 不污染全局，通过 k.xxx 调用
-})
+update(time: number, delta: number): void {
+    if (this.state !== GameState.PLAYING) return;
 
-// 场景
-k.scene('game', () => {
-  // 场景内容...
-  k.onUpdate(() => { /* 每帧执行 */ })
-  k.onDraw(() => { /* 自定义绘制 */ })
-})
-k.go('game')
+    this.tickAccumulator += delta;
+    const currentInterval = TICK_INTERVAL * this.effectManager.getSpeedMultiplier();
 
-// 创建游戏对象（矩形）
-const obj = k.add([
-  k.rect(30, 30),
-  k.pos(100, 100),
-  k.color(56, 142, 60),  // #388E3C
-])
+    if (this.tickAccumulator >= currentInterval) {
+        this.tickAccumulator -= currentInterval;
+        this.gameTick(delta); // 执行一次游戏逻辑
+    }
 
-// 键盘输入
-k.onKeyPress('up', () => { /* ... */ })
-k.onKeyPress('space', () => { /* ... */ })
-
-// 每帧更新
-k.onUpdate(() => {
-  // deltaTime 自动可用
-})
+    // 每帧都更新的内容：粒子、食物闪烁
+    this.food.draw();
+}
 ```
 
-## 十三、HTML 结构变更
+### 10.3 响应式适配
 
-分数面板、静音按钮、虚拟方向键保留为 DOM 元素（不迁入引擎 UI），理由：
-1. 这些 UI 元素已有完善的 CSS 响应式布局
-2. DOM 操作比引擎内绘制文字更简单
-3. 无需重写 CSS 样式
+使用 Phaser Scale Manager：
 
-变更点：
-- `<script type="module" src="js/main.js">` → `<script type="module" src="/src/main.ts">`（Vite 开发模式直接引用 TS）
-- Canvas 元素保留，由 Kaplay 接管渲染
+```typescript
+// config.ts 中的缩放配置（伪代码）
+scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: CANVAS_SIZE,   // 600
+    height: CANVAS_SIZE,  // 600
+    max: { width: 1000, height: 1000 },
+}
+```
+
+Phaser Scale.FIT 会自动将画布缩放到容器大小并保持比例，替代现有 CSS `width: min(90vw, 90vh)` 的方案。
+
+### 10.4 HTML 结构变更
+
+分数面板、静音按钮、虚拟方向键保留为 DOM 元素（不迁入 Phaser UI 系统），理由：
+1. DOM 元素的文字渲染更清晰
+2. 虚拟方向键需要 touch 事件，DOM 按钮更可靠
+3. 减少迁移工作量
+
+```html
+<!-- index.html 结构保持不变，仅修改 canvas 部分 -->
+<div class="game-container">
+    <div class="score-panel">
+        <span id="score">分数: 0</span>
+        <span id="highScore">最高分: 0</span>
+        <button id="muteBtn" class="icon-btn">🔊</button>
+    </div>
+    <!-- Phaser 会自动创建 canvas 并插入到 parent 容器 -->
+    <div id="game-canvas"></div>
+    <div id="dpad" class="dpad-container">
+        <!-- 虚拟方向键保持不变 -->
+    </div>
+</div>
+<script type="module" src="/src/main.ts"></script>
+```
+
+## 十一、迁移顺序与依赖关系
+
+### 11.1 分模块迁移顺序
+
+迁移按依赖关系分层，每层完成后可独立验证：
+
+| 迁移阶段 | 模块 | 验证标准 | 对应子任务 |
+|----------|------|----------|------------|
+| **阶段1：项目骨架** | Vite + Phaser 初始化、constants.ts、types.ts、config.ts、main.ts | Phaser 画布正常显示，背景色 #0f0f23 | TASK-010 |
+| **阶段2：核心玩法** | GameScene（状态管理+游戏循环）、Snake、Food、ScoreManager、EffectManager | 蛇能移动、吃食物、碰撞检测、分数计算、效果系统正常 | TASK-011 |
+| **阶段3：输入系统** | InputManager（键盘+触屏+虚拟方向键） | 键盘/触屏/虚拟键均可控制蛇方向，暂停/恢复正常 | TASK-012 |
+| **阶段4：视觉与音效** | Particle、SoundManager、UIScene（遮罩+指示器） | 粒子特效、音效、暂停遮罩、游戏结束界面、效果指示器正常 | TASK-013 |
+| **阶段5：部署与收尾** | GitHub Actions 更新、响应式适配验证、旧代码清理 | GitHub Pages 部署成功，全功能验证通过 | TASK-014 |
+
+### 11.2 阶段依赖图
+
+```
+阶段1（骨架）
+    ↓
+阶段2（核心玩法）← 依赖阶段1
+    ↓
+阶段3（输入系统）← 依赖阶段2（需要 GameScene 接收输入）
+    ↓
+阶段4（视觉与音效）← 依赖阶段2（需要游戏事件触发粒子/音效）
+    ↓
+阶段5（部署收尾）← 依赖阶段3+4 全部完成
+```
+
+> 注意：阶段3 和阶段4 之间无直接依赖，理论上可并行，但考虑到都需要修改 GameScene，建议串行以避免冲突。
+
+## 十二、模块分配表
+
+| 模块 | 负责目录 | 负责角色 | 可读目录 | 禁止触碰 |
+|------|----------|----------|---------|----------|
+| 项目骨架 | `src/main.ts`, `src/config.ts`, `src/constants.ts`, `src/types.ts`, `index.html`, `package.json`, `vite.config.ts`, `tsconfig.json` | 前端开发 | 全部 src/ | — |
+| 核心玩法 | `src/scenes/GameScene.ts`, `src/objects/Snake.ts`, `src/objects/Food.ts`, `src/managers/EffectManager.ts`, `src/managers/ScoreManager.ts` | 前端开发 | 全部 src/ | — |
+| 输入系统 | `src/managers/InputManager.ts` | 前端开发 | 全部 src/ | — |
+| 视觉与音效 | `src/scenes/UIScene.ts`, `src/objects/Particle.ts`, `src/managers/SoundManager.ts` | 前端开发 | 全部 src/ | — |
+| 部署配置 | `.github/workflows/deploy-pages.yml` | 运维 | 全部 | src/ 下所有文件 |
+
+> 本项目为单人前端重构，所有 src/ 代码由同一个前端开发者负责，无并行冲突风险。
+> 共享文件 `src/constants.ts`、`src/types.ts` 由前端开发者统一维护。
+
+## 十三、开发层级（L1/L2/L3）
+
+| 层级 | 包含任务 | 说明 |
+|------|----------|------|
+| L1 | TASK-009（本任务：架构设计） | 无前置依赖 |
+| L2 | TASK-010（项目骨架搭建） | 依赖 L1 设计文档 |
+| L2 | TASK-011（核心玩法迁移） | 依赖 TASK-010 骨架 |
+| L2 | TASK-012（输入系统迁移） | 依赖 TASK-011 核心玩法 |
+| L2 | TASK-013（视觉与音效迁移） | 依赖 TASK-011 核心玩法 |
+| L2 | TASK-014（部署与收尾） | 依赖 TASK-012 + TASK-013 |
+
+> TASK-010 ~ TASK-014 均为 L2 层级（依赖 L1 设计完成），由 PM 创建具体 Issue。
 
 ## 十四、开发者注意事项
 
-1. **Kaplay `global: false` 模式**：所有 Kaplay API 通过返回的实例 `k` 调用（`k.add()`, `k.onKeyPress()` 等），不污染全局命名空间。需要将 `k` 实例传递给各模块或通过单例导出
-2. **网格坐标 → 像素坐标转换**：所有游戏逻辑使用网格坐标（0-19），渲染时乘以 `CELL_SIZE` 转为像素。此转换在各 objects 模块内部完成
-3. **音效保留 Web Audio API**：不使用 Kaplay 音频系统，`sound.ts` 基本保留现有实现，仅加 TypeScript 类型
-4. **食物形状绘制**：Kaplay 内置 `rect`/`circle`，菱形/三角/星形需用 `k.onDraw()` 自定义绘制，参考现有 `renderer.js` 的 `drawFood()` 方法
-5. **粒子系统**：优先使用 Kaplay 内置粒子能力；若表现力不足，可用 `k.onDraw()` + 手动管理粒子数组（类似现有实现但代码更少）
-6. **旧代码保留**：`js/` 目录在迁移完成并验收通过前不删除，便于对比验证
+1. **Phaser 版本**：使用 `phaser@^3.88.0`（当前最新稳定版 3.90.0），通过 npm 安装
+2. **渲染模式**：优先 WebGL，自动降级 Canvas（Phaser 默认行为）
+3. **游戏循环**：不要使用 `setInterval`，使用 Phaser `update()` + tick 累积器
+4. **坐标系统**：Phaser 坐标原点在左上角，与现有 Canvas 一致，无需转换
+5. **音效系统**：保留 Web Audio API 合成，不引入音频文件（PRD 约束）
+6. **常量不变**：`constants.ts` 中所有数值必须与 `js/constants.js` 完全一致
+7. **视觉一致**：蛇头 #388E3C、背景 #0f0f23/#1a1a2e/#16213e、食物颜色/形状、墙壁 #3a3a5c 等必须与现有版本一致
+8. **DOM 元素保留**：分数面板、静音按钮、虚拟方向键保持 DOM 实现，通过 JS 事件桥接到 Phaser
+9. **旧代码处理**：迁移完成后删除 `js/` 目录，不保留旧代码
+10. **TypeScript 严格模式**：`tsconfig.json` 开启 `strict: true`
+
