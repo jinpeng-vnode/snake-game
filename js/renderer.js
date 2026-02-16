@@ -62,9 +62,9 @@ const Renderer = {
             }
 
             if (index === 0) {
-                // 蛇头：圆角矩形 + 眼睛
+                // 蛇头：圆角矩形 + 眼睛（UI规格: #388E3C 深绿）
                 const radius = CELL_SIZE * 0.3;
-                ctx.fillStyle = '#4CAF50';
+                ctx.fillStyle = '#388E3C';
                 ctx.beginPath();
                 ctx.moveTo(x + radius, y);
                 ctx.lineTo(x + size - radius, y);

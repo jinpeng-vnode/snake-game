@@ -22,17 +22,22 @@ const Food = {
      * @returns {void}
      */
     spawn(isOccupied) {
-        // 按概率选择食物类型
-        const roll = Math.random();
-        let cumulative = 0;
-        let selectedType = FoodType.NORMAL;
+        // 先决定是否出特殊食物（特殊概率之和 = 0.5），再在特殊类型中按权重选择
         const specialTypes = [FoodType.SPEED, FoodType.SLOW, FoodType.DOUBLE, FoodType.SHRINK];
+        const totalSpecial = specialTypes.reduce((s, ft) => s + ft.probability, 0);
+        const roll = Math.random();
 
-        for (const ft of specialTypes) {
-            cumulative += ft.probability;
-            if (roll < cumulative) {
-                selectedType = ft;
-                break;
+        let selectedType = FoodType.NORMAL;
+        if (roll < totalSpecial) {
+            // 在特殊类型中按权重选择
+            const innerRoll = Math.random() * totalSpecial;
+            let cumulative = 0;
+            for (const ft of specialTypes) {
+                cumulative += ft.probability;
+                if (innerRoll < cumulative) {
+                    selectedType = ft;
+                    break;
+                }
             }
         }
 
